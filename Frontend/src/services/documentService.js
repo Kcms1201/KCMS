@@ -120,6 +120,30 @@ const documentService = {
     const response = await api.post(`/clubs/${clubId}/documents/drive-link`, driveData);
     return response.data;
   },
+
+  // Link existing photos to events (Utility for admins)
+  linkPhotosToEvents: async (clubId, data) => {
+    const response = await api.post(`/clubs/${clubId}/documents/link-to-events`, data);
+    return response.data;
+  },
+
+  // Get storage statistics (Leadership only)
+  getStorageStats: async (clubId) => {
+    const response = await api.get(`/clubs/${clubId}/documents/storage/stats`);
+    return response.data;
+  },
+
+  // Find duplicate images (Leadership only)
+  findDuplicates: async (clubId) => {
+    const response = await api.get(`/clubs/${clubId}/documents/storage/duplicates`);
+    return response.data;
+  },
+
+  // Get upload signature for direct upload to Cloudinary
+  getUploadSignature: async (clubId, uploadData) => {
+    const response = await api.post(`/clubs/${clubId}/documents/upload/signature`, uploadData);
+    return response.data;
+  },
 };
 
 export default documentService;

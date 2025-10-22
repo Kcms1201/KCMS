@@ -55,4 +55,19 @@ router.get(
   ctrl.listClubPendingRegistrations
 );
 
+// ✅ NEW: Audition management
+// Get pending auditions for a club
+router.get(
+  '/clubs/:clubId/pending-auditions',
+  authenticate,
+  ctrl.listPendingAuditions
+);
+
+// Update audition status (pass/fail)
+router.post(
+  '/registrations/:registrationId/audition',
+  authenticate,
+  ctrl.updateAuditionStatus
+);
+
 module.exports = router;

@@ -18,6 +18,18 @@ class DocumentService {
     const docs = [];
 
     for (const file of files) {
+      // Check for duplicate filename in same album
+      const existingDoc = await Document.findOne({
+        club: clubId,
+        album: album,
+        'metadata.filename': file.originalname
+      });
+
+      if (existingDoc) {
+        console.log(`⚠️ Skipping duplicate file: ${file.originalname}`);
+        continue; // Skip this file
+      }
+
       const ext = file.mimetype.split('/')[1].toLowerCase();
       let type, url, thumbUrl;
 
@@ -50,11 +62,12 @@ class DocumentService {
         throw err;
       }
 
-      // Persist metadata
+      // Persist metadata with explicit storageType
       const doc = await Document.create({
         club: clubId,
         album,
         type,
+        storageType: 'cloudinary', // Explicitly set for counting
         url,
         thumbUrl,
         metadata: {

@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import Layout from '../../components/Layout';
 import eventService from '../../services/eventService';
+import clubService from '../../services/clubService';
 import '../../styles/Forms.css';
 
 const EditEventPage = () => {
@@ -10,6 +11,8 @@ const EditEventPage = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [event, setEvent] = useState(null);
+  const [allClubs, setAllClubs] = useState([]);
+  const [selectedParticipatingClubs, setSelectedParticipatingClubs] = useState([]);
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -23,6 +26,8 @@ const EditEventPage = () => {
     isPublic: true,
     budget: '',
     guestSpeakers: '',
+    requiresAudition: false,
+    allowPerformerRegistrations: true,
   });
   const [files, setFiles] = useState({
     proposal: null,
@@ -35,7 +40,18 @@ const EditEventPage = () => {
 
   useEffect(() => {
     fetchEventData();
+    fetchAllClubs();
   }, [id]);
+
+  const fetchAllClubs = async () => {
+    try {
+      const response = await clubService.listClubs();
+      const clubs = response.data?.clubs || [];
+      setAllClubs(clubs);
+    } catch (error) {
+      console.error('Error fetching clubs:', error);
+    }
+  };
 
   const fetchEventData = async () => {
     try {
@@ -73,7 +89,17 @@ const EditEventPage = () => {
         isPublic: eventData.isPublic !== undefined ? eventData.isPublic : true,
         budget: eventData.budget || '',
         guestSpeakers: eventData.guestSpeakers ? eventData.guestSpeakers.join(', ') : '',
+        requiresAudition: eventData.requiresAudition || false,
+        allowPerformerRegistrations: eventData.allowPerformerRegistrations !== undefined ? eventData.allowPerformerRegistrations : true,
       });
+
+      // Pre-fill participating clubs
+      if (eventData.participatingClubs && Array.isArray(eventData.participatingClubs)) {
+        const clubIds = eventData.participatingClubs.map(club => 
+          club._id || club
+        );
+        setSelectedParticipatingClubs(clubIds);
+      }
     } catch (err) {
       console.error('Error fetching event:', err);
       setError(err.response?.data?.message || 'Failed to load event');
@@ -128,12 +154,36 @@ const EditEventPage = () => {
         }
       }
 
+      // Append participating clubs
+      console.log('🚀 BEFORE SUBMIT - Selected clubs:', selectedParticipatingClubs);
+      console.log('🚀 BEFORE SUBMIT - Number of clubs:', selectedParticipatingClubs.length);
+      
+      if (selectedParticipatingClubs.length > 0) {
+        const clubsJSON = JSON.stringify(selectedParticipatingClubs);
+        console.log('📤 Sending participatingClubs:', clubsJSON);
+        formDataToSend.append('participatingClubs', clubsJSON);
+      } else {
+        console.warn('⚠️ No clubs selected, not sending participatingClubs field');
+      }
+
+      // Append audition and registration settings
+      formDataToSend.append('requiresAudition', formData.requiresAudition);
+      formDataToSend.append('allowPerformerRegistrations', formData.allowPerformerRegistrations);
+
       // Append new files (if uploaded)
       if (files.proposal) formDataToSend.append('proposal', files.proposal);
       if (files.budgetBreakdown) formDataToSend.append('budgetBreakdown', files.budgetBreakdown);
       if (files.venuePermission) formDataToSend.append('venuePermission', files.venuePermission);
 
+      // Debug: Log all FormData entries
+      console.log('📋 FormData contents:');
+      for (let [key, value] of formDataToSend.entries()) {
+        console.log(`  ${key}:`, value);
+      }
+
+      console.log('🚀 Calling eventService.update...');
       await eventService.update(id, formDataToSend);
+      console.log('✅ Update successful!');
       alert('✅ Event updated successfully! Status remains as DRAFT. You can submit it for approval when ready.');
       navigate(`/events/${id}`);
     } catch (err) {
@@ -387,6 +437,76 @@ const EditEventPage = () => {
                 onChange={handleChange}
                 placeholder="e.g., Dr. John Doe, Prof. Jane Smith"
               />
+            </div>
+
+            {/* Club Collaboration Section */}
+            <div className="form-section">
+              <h3>🤝 Club Collaboration</h3>
+              <p className="section-description">
+                Select additional clubs participating in this event.
+                <br/><strong>Note:</strong> All members from selected clubs will be automatically tracked for attendance.
+              </p>
+              
+              <div className="form-group">
+                <label htmlFor="participatingClubs">Participating Clubs (Optional)</label>
+                <select 
+                  multiple 
+                  id="participatingClubs"
+                  value={selectedParticipatingClubs}
+                  onChange={(e) => {
+                    const values = Array.from(e.target.selectedOptions, option => option.value);
+                    console.log('✅ Selected clubs:', values);
+                    console.log('📊 Number of clubs selected:', values.length);
+                    setSelectedParticipatingClubs(values);
+                  }}
+                  className="multi-select"
+                  size="5"
+                >
+                  {allClubs
+                    .filter(club => club._id !== event?.club?._id) // Don't show primary club
+                    .map(club => (
+                      <option key={club._id} value={club._id}>
+                        {club.name}
+                      </option>
+                    ))}
+                </select>
+                <small className="form-hint">
+                  Hold Ctrl (Cmd on Mac) to select multiple. Selected: {selectedParticipatingClubs.length} clubs
+                </small>
+              </div>
+            </div>
+
+            {/* Registration Settings */}
+            <div className="form-section">
+              <h3>📝 Registration Settings</h3>
+              
+              <div className="form-group">
+                <label>
+                  <input
+                    type="checkbox"
+                    name="allowPerformerRegistrations"
+                    checked={formData.allowPerformerRegistrations}
+                    onChange={handleChange}
+                  />
+                  <span>Allow student performer registrations</span>
+                </label>
+                <small className="form-hint">Students can register to perform in this event</small>
+              </div>
+
+              {formData.allowPerformerRegistrations && (
+                <div className="form-group">
+                  <label>
+                    <input
+                      type="checkbox"
+                      name="requiresAudition"
+                      checked={formData.requiresAudition}
+                      onChange={handleChange}
+                    />
+                    <span>Requires audition for performers</span>
+                  </label>
+                  <small className="form-hint">Performers must pass audition to be approved</small>
+                </div>
+              )}
             </div>
 
             <div className="form-group">

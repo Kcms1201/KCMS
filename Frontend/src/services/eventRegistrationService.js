@@ -52,6 +52,20 @@ const eventRegistrationService = {
       params: eventId ? { eventId } : {} 
     });
   },
+
+  /**
+   * Get pending auditions for a club
+   */
+  listPendingAuditions: (clubId) => {
+    return api.get(`/clubs/${clubId}/pending-auditions`);
+  },
+
+  /**
+   * Update audition status (pass/fail)
+   */
+  updateAuditionStatus: (registrationId, auditionData) => {
+    return api.post(`/registrations/${registrationId}/audition`, auditionData);
+  },
 };
 
 export default eventRegistrationService;

@@ -92,6 +92,27 @@ const eventService = {
     });
     return response.data;
   },
+
+  // Get Event Organizers (club members working at event)
+  getEventOrganizers: async (id) => {
+    const response = await api.get(`/events/${id}/organizers`);
+    return response.data;
+  },
+
+  // Update Organizer Attendance (bulk update)
+  updateOrganizerAttendance: async (id, attendanceData) => {
+    const response = await api.post(`/events/${id}/organizer-attendance`, attendanceData);
+    return response.data;
+  },
+
+  // Generate Attendance Report (JSON or CSV)
+  generateAttendanceReport: async (id, format = 'json') => {
+    const response = await api.get(`/events/${id}/attendance-report`, {
+      params: { format },
+      responseType: format === 'csv' ? 'blob' : 'json'
+    });
+    return response;
+  },
 };
 
 export default eventService;

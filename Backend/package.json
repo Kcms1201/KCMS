@@ -20,6 +20,8 @@
     "generate:keys": "node scripts/generate-keys.js",
     "generate:rsa-keys": "node scripts/generate-rsa-keys.js",
     "db:indexes": "node scripts/create-indexes.js",
+    "fix:photo-storage": "node scripts/fix-photo-storage-type.js",
+    "fix:duplicates": "node scripts/remove-duplicate-photos.js",
     "lint": "eslint .",
     "test": "jest --coverage"
   },
@@ -31,7 +33,7 @@
     "cors": "^2.8.5",
     "crypto": "^1.0.1",
     "dotenv": "^16.0.3",
-    "exceljs": "^4.3.0",
+    "exceljs": "^4.4.0",
     "express": "^4.18.2",
     "express-rate-limit": "^6.7.0",
     "helmet": "^6.0.1",
@@ -47,6 +49,7 @@
     "pdfkit": "^0.13.0",
     "qrcode": "^1.5.3",
     "sharp": "^0.34.4",
+    "streamifier": "^0.1.1",
     "uuid": "^9.0.1",
     "web-push": "^3.6.7",
     "winston": "^3.8.2"

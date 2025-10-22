@@ -21,15 +21,31 @@ class EventRegistrationService {
       throw err;
     }
 
-    // Check if already registered
-    const existing = await EventRegistration.findOne({ 
-      event: eventId, 
-      user: userContext.id 
-    });
-    if (existing) {
-      const err = new Error('Already registered for this event');
-      err.statusCode = 400;
-      throw err;
+    // Check if already registered for this specific club
+    // Allow multiple registrations for different clubs (e.g., Dance for Club A, Singing for Club B)
+    if (data.registrationType === 'performer' && data.representingClub) {
+      const existing = await EventRegistration.findOne({ 
+        event: eventId, 
+        user: userContext.id,
+        representingClub: data.representingClub
+      });
+      if (existing) {
+        const err = new Error('Already registered for this event with this club');
+        err.statusCode = 400;
+        throw err;
+      }
+    } else if (data.registrationType === 'audience') {
+      // For audience, check if already registered as audience
+      const existing = await EventRegistration.findOne({ 
+        event: eventId, 
+        user: userContext.id,
+        registrationType: 'audience'
+      });
+      if (existing) {
+        const err = new Error('Already registered as audience for this event');
+        err.statusCode = 400;
+        throw err;
+      }
     }
 
     // Validate performer registration
@@ -40,30 +56,25 @@ class EventRegistrationService {
         throw err;
       }
 
-      if (!data.club) {
-        const err = new Error('Club is required for performer registration');
+      if (!data.representingClub) {
+        const err = new Error('Club selection is required for performer registration');
         err.statusCode = 400;
         throw err;
       }
 
-      // Verify club is participating in event
-      if (!event.participatingClubs.some(c => c._id.toString() === data.club)) {
-        const err = new Error('Selected club is not participating in this event');
+      // Verify club is participating in event (primary or participating)
+      const allClubIds = [event.club.toString(), ...event.participatingClubs.map(c => c._id.toString())];
+      if (!allClubIds.includes(data.representingClub)) {
+        const err = new Error('Selected club is not involved in this event');
         err.statusCode = 400;
         throw err;
       }
+    }
 
-      // Verify user is member of the club
-      const membership = await Membership.findOne({
-        club: data.club,
-        user: userContext.id,
-        status: 'approved'
-      });
-      if (!membership) {
-        const err = new Error('You are not a member of the selected club');
-        err.statusCode = 403;
-        throw err;
-      }
+    // Determine audition status
+    let auditionStatus = 'not_required';
+    if (data.registrationType === 'performer' && event.requiresAudition) {
+      auditionStatus = 'pending_audition';
     }
 
     // Create registration
@@ -71,28 +82,24 @@ class EventRegistrationService {
       event: eventId,
       user: userContext.id,
       registrationType: data.registrationType || 'audience',
-      club: data.club,
+      representingClub: data.representingClub,
       performanceType: data.performanceType,
       performanceDescription: data.performanceDescription,
       notes: data.notes,
+      auditionStatus: auditionStatus,
       status: data.registrationType === 'performer' ? 'pending' : 'approved'
     });
 
     await registration.save();
 
-    // If audience, auto-approve and create attendance
-    if (registration.registrationType === 'audience') {
-      await Attendance.create({
-        event: eventId,
-        user: userContext.id,
-        status: 'rsvp',
-        type: 'audience',
-        timestamp: new Date()
-      });
-    } else {
+    // ✅ NOTE: We do NOT create attendance records for registrations!
+    // Attendance is ONLY for club members (organizers/volunteers) - created when event is created/published
+    // Registrations are separate - they track who wants to attend/perform
+    
+    if (registration.registrationType === 'performer') {
       // Notify club presidents about performer registration
       const clubMembers = await Membership.find({
-        club: data.club,
+        club: data.representingClub,
         role: { $in: ['president', 'vicePresident'] },
         status: 'approved'
       }).distinct('user');
@@ -118,12 +125,12 @@ class EventRegistrationService {
       user: userContext.id,
       action: 'EVENT_REGISTER',
       target: `Event:${eventId}`,
-      newValue: { type: registration.registrationType, club: data.club },
+      newValue: { type: registration.registrationType, representingClub: data.representingClub },
       ip: userContext.ip,
       userAgent: userContext.userAgent
     });
 
-    return registration.populate('club user');
+    return registration.populate('representingClub user');
   }
 
   /**
@@ -131,7 +138,7 @@ class EventRegistrationService {
    */
   async reviewRegistration(registrationId, decision, userContext) {
     const registration = await EventRegistration.findById(registrationId)
-      .populate('event club user');
+      .populate('event representingClub user');
 
     if (!registration) {
       const err = new Error('Registration not found');
@@ -151,19 +158,22 @@ class EventRegistrationService {
       throw err;
     }
 
-    // Check if user has permission (club president/vicePresident or admin)
+    // Check if user has permission (club president/vicePresident/core or admin)
+    // ✅ CORRECT LOGIC: Check if user is a leader of the REPRESENTING club
+    // Example: Dance Club student performs at Music Club event
+    // -> Dance Club leaders approve their own performers
     const user = await User.findById(userContext.id);
     const isAdmin = user.roles?.global === 'admin';
     
     const membership = await Membership.findOne({
-      club: registration.club._id,
+      club: registration.representingClub._id,  // ✅ Check representing club (performer's club)
       user: userContext.id,
-      role: { $in: ['president', 'vicePresident'] },
+      role: { $in: ['president', 'vicePresident', 'core'] },
       status: 'approved'
     });
 
     if (!isAdmin && !membership) {
-      const err = new Error('Forbidden: Only club leaders can review registrations');
+      const err = new Error('Forbidden: Only representing club leaders can review their performers');
       err.statusCode = 403;
       throw err;
     }
@@ -178,17 +188,9 @@ class EventRegistrationService {
 
     await registration.save();
 
-    // If approved, create performer attendance
-    if (decision.status === 'approved') {
-      await Attendance.create({
-        event: registration.event._id,
-        user: registration.user._id,
-        status: 'rsvp',
-        type: 'performer',
-        club: registration.club._id,
-        timestamp: new Date()
-      });
-    }
+    // ✅ NOTE: We do NOT create attendance records for approved performers!
+    // Attendance is ONLY for club members (organizers) who are working at the event
+    // Performer registrations are tracked separately in EventRegistration collection
 
     // Notify student
     const notifType = decision.status === 'approved' 
@@ -201,7 +203,7 @@ class EventRegistrationService {
       payload: {
         eventId: registration.event._id,
         eventTitle: registration.event.title,
-        club: registration.club.name,
+        club: registration.representingClub.name,
         performanceType: registration.performanceType,
         rejectionReason: decision.rejectionReason
       },
@@ -232,12 +234,12 @@ class EventRegistrationService {
     if (filters.status) {
       query.status = filters.status;
     }
-    if (filters.club) {
-      query.club = filters.club;
+    if (filters.representingClub) {
+      query.representingClub = filters.representingClub;
     }
 
     const registrations = await EventRegistration.find(query)
-      .populate('user club approvedBy')
+      .populate('user representingClub approvedBy')
       .sort({ createdAt: -1 });
 
     return registrations;
@@ -250,7 +252,7 @@ class EventRegistrationService {
     const registration = await EventRegistration.findOne({ 
       event: eventId, 
       user: userId 
-    }).populate('club approvedBy');
+    }).populate('representingClub approvedBy');
 
     return registration;
   }
@@ -260,7 +262,7 @@ class EventRegistrationService {
    */
   async listClubPendingRegistrations(clubId, eventId = null) {
     const query = {
-      club: clubId,
+      representingClub: clubId,
       registrationType: 'performer',
       status: 'pending'
     };
@@ -351,6 +353,129 @@ class EventRegistrationService {
     });
 
     return { message: 'Registration cancelled successfully' };
+  }
+
+  /**
+   * Update audition status (for club core members)
+   * After conducting auditions, mark students as passed/failed
+   */
+  async updateAuditionStatus(registrationId, auditionData, userContext) {
+    const registration = await EventRegistration.findById(registrationId)
+      .populate('event representingClub user');
+
+    if (!registration) {
+      const err = new Error('Registration not found');
+      err.statusCode = 404;
+      throw err;
+    }
+
+    if (registration.auditionStatus === 'not_required') {
+      const err = new Error('This registration does not require audition');
+      err.statusCode = 400;
+      throw err;
+    }
+
+    // Check permission - user must be core member of REPRESENTING club
+    // ✅ CORRECT: Representing club leaders conduct auditions for their own performers
+    const membership = await Membership.findOne({
+      club: registration.representingClub._id,  // ✅ Check representing club
+      user: userContext.id,
+      role: { $in: ['president', 'vicePresident', 'core', 'secretary', 'treasurer'] },
+      status: 'approved'
+    });
+
+    if (!membership && userContext.roles?.global !== 'admin') {
+      const err = new Error('Forbidden: Only representing club members can update audition status');
+      err.statusCode = 403;
+      throw err;
+    }
+
+    // Update audition status
+    registration.auditionStatus = auditionData.auditionStatus; // 'audition_passed' or 'audition_failed'
+    registration.auditionDate = auditionData.auditionDate || new Date();
+    registration.auditionNotes = auditionData.auditionNotes;
+
+    // If audition passed, auto-approve the registration
+    if (auditionData.auditionStatus === 'audition_passed') {
+      registration.status = 'approved';
+      registration.approvedBy = userContext.id;
+      registration.approvedAt = new Date();
+    } else if (auditionData.auditionStatus === 'audition_failed') {
+      registration.status = 'rejected';
+      registration.rejectionReason = 'Did not pass audition';
+    }
+
+    await registration.save();
+
+    // Send notification to student
+    const notificationType = auditionData.auditionStatus === 'audition_passed' 
+      ? 'audition_passed' 
+      : 'audition_failed';
+      
+    await notificationService.create({
+      user: registration.user._id,
+      type: notificationType,
+      payload: {
+        eventId: registration.event._id,
+        eventTitle: registration.event.title,
+        clubName: registration.representingClub.name,
+        auditionNotes: auditionData.auditionNotes,
+        status: auditionData.auditionStatus
+      },
+      priority: 'HIGH'
+    });
+
+    // If approved, create performer attendance
+    if (auditionData.auditionStatus === 'audition_passed') {
+      await Attendance.findOneAndUpdate(
+        {
+          event: registration.event._id,
+          user: registration.user._id
+        },
+        {
+          event: registration.event._id,
+          user: registration.user._id,
+          status: 'rsvp',
+          type: 'performer',
+          club: registration.representingClub._id,
+          timestamp: new Date()
+        },
+        { upsert: true }
+      );
+    }
+
+    // Audit log
+    await auditService.log({
+      user: userContext.id,
+      action: 'AUDITION_STATUS_UPDATE',
+      target: `EventRegistration:${registrationId}`,
+      newValue: { auditionStatus: auditionData.auditionStatus },
+      ip: userContext.ip,
+      userAgent: userContext.userAgent
+    });
+
+    return registration;
+  }
+
+  /**
+   * Get registrations pending audition for a club
+   */
+  async listPendingAuditions(clubId, eventId = null) {
+    const query = {
+      representingClub: clubId,
+      registrationType: 'performer',
+      auditionStatus: 'pending_audition'
+    };
+
+    if (eventId) {
+      query.event = eventId;
+    }
+
+    const registrations = await EventRegistration.find(query)
+      .populate('event user')
+      .sort({ createdAt: -1 });
+
+    return registrations;
   }
 }
 

@@ -8,6 +8,13 @@ const { startNotificationBatcher } = require('./workers/notification.batcher');
 const { startRecruitmentScheduler } = require('./workers/recruitment.scheduler');
 const { verifyTransport } = require('./utils/mail');
 
+// ✅ Import workers
+const auditWorker = require('./workers/audit.worker');
+const notificationWorker = require('./workers/notification.worker');
+const recruitmentWorker = require('./workers/recruitment.worker');
+const eventCompletionWorker = require('./workers/event-completion.worker');
+const eventReportWorker = require('./workers/event-report.worker');
+
 const PORT = config.PORT;
 const MONGO_URI = config.MONGODB_URI;
 
@@ -35,6 +42,14 @@ async function start() {
     try {
       schedulers = startSchedulers();
       console.log('QueueSchedulers started');
+      
+      // ✅ Workers are automatically started on import
+      console.log('✅ Workers started:');
+      console.log('   - Audit Worker: Processing audit logs');
+      console.log('   - Notification Worker: Processing notifications');
+      console.log('   - Recruitment Worker: Processing recruitment tasks');
+      console.log('   - Event Completion Worker: Monitoring event completion ✨');
+      console.log('   - Event Report Worker: Generating event reports ✨');
     } catch (e) {
       console.error('Failed to start QueueSchedulers:', e);
     }

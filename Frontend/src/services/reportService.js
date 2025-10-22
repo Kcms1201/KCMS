@@ -9,8 +9,13 @@ const reportService = {
 
   // Get club activity report data (Coordinator/Admin only)
   getClubActivity: async (params = {}) => {
-    const response = await api.get('/reports/club-activity', { params });
-    return response.data;
+    // If format is excel, request blob response
+    const config = params.format === 'excel' 
+      ? { params, responseType: 'blob' }
+      : { params };
+    
+    const response = await api.get('/reports/club-activity', config);
+    return params.format === 'excel' ? response : response.data;
   },
 
   // Get NAAC/NBA report data (Admin only)

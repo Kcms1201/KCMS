@@ -18,6 +18,7 @@ const reportRoutes = require('./modules/reports/report.routes');
 const searchRoutes = require('./modules/search/search.routes');
 const adminRoutes = require('./modules/admin/admin.routes');
 const settingsRoutes = require('./modules/settings/settings.routes');
+const analyticsRoutes = require('./modules/analytics/analytics.routes');
 
 const error = require('./middlewares/error');
 const { maintenanceMode } = require('./middlewares/maintenance');
@@ -80,6 +81,7 @@ app.use('/api/reports', reportRoutes);
 app.use('/api/search', searchRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/settings', settingsRoutes);
+app.use('/api/analytics', analyticsRoutes);
 
 // 404
 app.use((req, res) => res.status(404).json({ message: 'Not Found' }));

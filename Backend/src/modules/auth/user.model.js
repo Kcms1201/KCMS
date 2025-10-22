@@ -20,9 +20,15 @@ const UserSchema = new mongoose.Schema({
 
   status: {
     type: String,
-    enum: ['pending', 'otp_sent', 'verified', 'profile_complete', 'locked', 'suspended'],
+    enum: ['pending', 'otp_sent', 'verified', 'profile_complete', 'locked', 'suspended', 'merged'],
     default: 'pending'
   },
+
+  // Merge tracking (Workplan Line 553: Merge duplicate accounts)
+  mergedInto: { type: mongoose.Types.ObjectId, ref: 'User' },
+  mergedAt: Date,
+  mergedBy: { type: mongoose.Types.ObjectId, ref: 'User' },
+  mergeReason: String,
 
   roles: {
     global: {

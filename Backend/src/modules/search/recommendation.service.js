@@ -54,11 +54,16 @@ class RecommendationService {
       return [];
     }
 
-    // Get clubs user is already member of
-    const userClubs = await Membership.find({
-      user: user._id,
-      status: 'approved'
-    }).distinct('club');
+    // Get clubs user is already member of OR coordinating
+    const [memberClubs, coordinatingClubs] = await Promise.all([
+      Membership.find({
+        user: user._id,
+        status: 'approved'
+      }).distinct('club'),
+      Club.find({ coordinator: user._id }).distinct('_id')
+    ]);
+    
+    const userClubs = [...memberClubs, ...coordinatingClubs];
 
     // Department-based scoring
     const departmentMapping = {
@@ -112,17 +117,20 @@ class RecommendationService {
    * Workplan Line 528: "Similar clubs to joined ones"
    */
   async getSimilarClubsRecommendations(userId) {
-    // Get user's current clubs
-    const userMemberships = await Membership.find({
-      user: userId,
-      status: 'approved'
-    }).populate('club').lean();
+    // Get user's current clubs (membership + coordinating)
+    const [userMemberships, coordinatingClubs] = await Promise.all([
+      Membership.find({
+        user: userId,
+        status: 'approved'
+      }).populate('club').lean(),
+      Club.find({ coordinator: userId }).distinct('_id')
+    ]);
 
     if (userMemberships.length === 0) {
       return [];
     }
 
-    const userClubIds = userMemberships.map(m => m.club._id);
+    const userClubIds = [...userMemberships.map(m => m.club._id), ...coordinatingClubs];
     const userClubCategories = userMemberships.map(m => m.club.category);
 
     // Find clubs in same categories but not joined
@@ -242,11 +250,16 @@ class RecommendationService {
     const user = await User.findById(userId).lean();
     if (!user) return [];
 
-    // Get clubs user is already member of
-    const userClubs = await Membership.find({
-      user: userId,
-      status: 'approved'
-    }).distinct('club');
+    // Get clubs user is already member of OR coordinating
+    const [memberClubs, coordinatingClubs] = await Promise.all([
+      Membership.find({
+        user: userId,
+        status: 'approved'
+      }).distinct('club'),
+      Club.find({ coordinator: userId }).distinct('_id')
+    ]);
+    
+    const userClubs = [...memberClubs, ...coordinatingClubs];
 
     // Find users from same department and batch (potential friends)
     const potentialFriends = await User.find({

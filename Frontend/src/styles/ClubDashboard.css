@@ -361,6 +361,100 @@
   color: var(--text-secondary);
 }
 
+/* Member Analytics Widget */
+.member-analytics-widget {
+  border: 2px solid #e7f3ff;
+}
+
+.widget-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
+.widget-header h3 {
+  margin: 0;
+}
+
+.btn-link {
+  background: none;
+  border: none;
+  color: #007bff;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.btn-link:hover {
+  color: #0056b3;
+  text-decoration: underline;
+}
+
+.analytics-quick-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.quick-stat {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem;
+  background: #f8f9fa;
+  border-radius: 8px;
+}
+
+.stat-icon {
+  font-size: 1.5rem;
+}
+
+.stat-icon.success {
+  color: #28a745;
+}
+
+.stat-icon.warning {
+  color: #ffc107;
+}
+
+.stat-icon.info {
+  color: #17a2b8;
+}
+
+.stat-info {
+  flex: 1;
+}
+
+.stat-label {
+  font-size: 0.75rem;
+  color: #666;
+  margin-bottom: 0.25rem;
+}
+
+.stat-value {
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: #333;
+  margin: 0;
+}
+
+.analytics-alert {
+  padding: 0.75rem;
+  background: #fff3cd;
+  border-left: 4px solid #ffc107;
+  border-radius: 4px;
+  margin-top: 1rem;
+}
+
+.analytics-alert p {
+  margin: 0;
+  font-size: 0.875rem;
+  color: #856404;
+}
+
 /* Events Section */
 .events-section,
 .recruitments-section,

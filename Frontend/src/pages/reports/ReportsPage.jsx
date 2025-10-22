@@ -28,7 +28,12 @@ function ReportsPage() {
   const [annualYear, setAnnualYear] = useState(new Date().getFullYear());
   const [clubs, setClubs] = useState([]);
 
-  const isAdminOrCoordinator = user?.roles?.global === 'admin' || user?.roles?.global === 'coordinator';
+  const isAdmin = user?.roles?.global === 'admin';
+  const isCoordinator = user?.roles?.global === 'coordinator';
+  const isAdminOrCoordinator = isAdmin || isCoordinator;
+  
+  // User ID can be either user.id or user._id depending on backend response
+  const userId = user?.id || user?._id;
 
   useEffect(() => {
     if (activeTab === 'dashboard') {
@@ -39,14 +44,17 @@ function ReportsPage() {
   }, [activeTab]);
 
   useEffect(() => {
-    fetchClubs();
-  }, []);
+    if (user) {
+      fetchClubs();
+    }
+  }, [userId, isCoordinator]);
 
   const fetchDashboardStats = async () => {
     try {
       setLoading(true);
       const response = await reportService.getDashboard();
-      setDashboardStats(response.data);
+      // Backend returns { status, data: { dashboard: {...} } }
+      setDashboardStats(response.data?.dashboard || response.data);
       setError(null);
     } catch (err) {
       console.error('Error fetching dashboard stats:', err);
@@ -73,8 +81,26 @@ function ReportsPage() {
   const fetchClubs = async () => {
     try {
       const response = await clubService.listClubs();
-      // Backend: successResponse(res, { total, clubs }) → { status, data: { total, clubs } }
-      setClubs(response.data?.clubs || []);
+      const allClubs = response.data?.clubs || [];
+      
+      // Coordinators only see clubs they coordinate
+      if (isCoordinator && userId) {
+        const coordinatedClubs = allClubs.filter(club => {
+          const coordinatorId = typeof club.coordinator === 'object' 
+            ? club.coordinator?._id 
+            : club.coordinator;
+          return coordinatorId === userId;
+        });
+        
+        setClubs(coordinatedClubs);
+        // Auto-select if only one club
+        if (coordinatedClubs.length === 1) {
+          setSelectedClub(coordinatedClubs[0]._id);
+        }
+      } else {
+        // Admin sees all clubs
+        setClubs(allClubs);
+      }
     } catch (err) {
       console.error('Error fetching clubs:', err);
     }
@@ -135,12 +161,21 @@ function ReportsPage() {
   };
 
   const downloadClubActivityExcel = async () => {
+    if (!selectedClub) {
+      alert('Please select a club');
+      return;
+    }
+
     try {
       setLoading(true);
-      const response = await reportService.getClubActivity({ format: 'excel' });
+      const response = await reportService.getClubActivity({ 
+        clubId: selectedClub,
+        year: clubActivityYear,
+        format: 'excel' 
+      });
 
-      // Note: This needs to be updated in Backend to return blob for Excel format
-      reportService.downloadBlob(response.data, `club-activity-report.xlsx`);
+      reportService.downloadBlob(response.data, `club-activity-${clubActivityYear}.xlsx`);
+      alert('Excel report downloaded successfully!');
     } catch (err) {
       console.error('Error downloading Excel:', err);
       alert('Failed to download Excel report');
@@ -181,12 +216,15 @@ function ReportsPage() {
           >
             <FaFileDownload /> Generate Reports
           </button>
-          <button
-            className={`tab-btn ${activeTab === 'audit' ? 'active' : ''}`}
-            onClick={() => setActiveTab('audit')}
-          >
-            <FaHistory /> Audit Logs
-          </button>
+          {/* Audit Logs - Admin Only */}
+          {isAdmin && (
+            <button
+              className={`tab-btn ${activeTab === 'audit' ? 'active' : ''}`}
+              onClick={() => setActiveTab('audit')}
+            >
+              <FaHistory /> Audit Logs
+            </button>
+          )}
         </div>
 
         {error && <div className="error-message">{error}</div>}
@@ -270,6 +308,16 @@ function ReportsPage() {
             <div className="report-section">
               <h2>Club Activity Report</h2>
               <p>Generate detailed activity report for a specific club and year</p>
+              {isCoordinator && clubs.length > 0 && (
+                <div className="info-message">
+                  <strong>Note:</strong> You can only generate reports for clubs you coordinate: <strong>{clubs.map(c => c.name).join(', ')}</strong>
+                </div>
+              )}
+              {isCoordinator && clubs.length === 0 && (
+                <div className="warning-message">
+                  <strong>Warning:</strong> You are not assigned as coordinator to any club. Please contact admin.
+                </div>
+              )}
               <div className="report-form">
                 <div className="form-group">
                   <label>Select Club</label>

@@ -15,6 +15,13 @@ class EventService {
   async create(data, files, userContext) {
     const evt = new Event(data);
 
+    // Parse participatingClubs if sent as string from FormData
+    if (data.participatingClubs) {
+      evt.participatingClubs = typeof data.participatingClubs === 'string' 
+        ? JSON.parse(data.participatingClubs) 
+        : data.participatingClubs;
+    }
+
     // Handle attachments
     if (files.proposal) {
       const r = await cloudinary.uploadFile(files.proposal[0].path, { folder: 'events/proposals' });
@@ -31,6 +38,33 @@ class EventService {
 
     await evt.save();
 
+    // ✅ Auto-create attendance records for ALL club members (primary + participating clubs)
+    // IMPORTANT: Includes ALL approved members regardless of role (member, core, vicePresident, president)
+    // This ensures regular members have participation data for promotion evaluations
+    const allClubIds = [evt.club, ...(evt.participatingClubs || [])];
+    
+    // Get all approved members from all involved clubs (NO role filter - includes everyone!)
+    const clubMembers = await Membership.find({
+      club: { $in: allClubIds },
+      status: 'approved'  // Only status check, NO role filtering
+    }).lean();
+    
+    // Create attendance records for all club members
+    const attendanceRecords = clubMembers.map(member => ({
+      event: evt._id,
+      user: member.user,
+      club: member.club,
+      status: 'absent', // Default status
+      type: 'organizer' // All club members are considered organizers/helpers
+    }));
+    
+    if (attendanceRecords.length > 0) {
+      await Attendance.insertMany(attendanceRecords, { ordered: false }).catch(err => {
+        // Ignore duplicate key errors (in case records already exist)
+        if (err.code !== 11000) throw err;
+      });
+    }
+
     // Audit log
     await auditService.log({
       user: userContext.id,
@@ -41,7 +75,7 @@ class EventService {
       userAgent: userContext.userAgent
     });
 
-    // ✅ Notification will be sent when event is SUBMITTED (changeStatus 'submit')
+    // Notification will be sent when event is SUBMITTED (changeStatus 'submit')
     // Not when created (status is 'draft')
 
     return evt;
@@ -49,7 +83,7 @@ class EventService {
 
   /**
    * List events with pagination and filters.
-   * ✅ Permission-based filtering:
+   * Permission-based filtering:
    * - draft/pending_coordinator/pending_admin: Only visible to creator, assigned coordinator, or admin
    * - published/ongoing/completed: Visible to everyone
    */
@@ -125,6 +159,7 @@ class EventService {
       Event.countDocuments(query),
       Event.find(query)
         .populate('club', 'name logo category') // Populate club details
+        .populate('participatingClubs', 'name logo category') // Populate participating clubs
         .skip(skip)
         .limit(limit)
         .sort(sortOrder)
@@ -136,7 +171,9 @@ class EventService {
    * Get event details with permission flags.
    */
   async getById(id, userContext) {
-    const evt = await Event.findById(id).populate('club', 'name logo category coordinator');
+    const evt = await Event.findById(id)
+      .populate('club', 'name logo category coordinator')
+      .populate('participatingClubs', 'name logo category');
     if (!evt) {
       const err = new Error('Event not found');
       err.statusCode = 404;
@@ -234,7 +271,6 @@ class EventService {
         ));
       } else {
         // Auto-publish if no admin approval needed
-        evt.status = 'approved';
         evt.status = 'published';
         
         // Notify all members
@@ -252,7 +288,6 @@ class EventService {
 
     } else if (action === 'approve' && prevStatus === 'pending_admin') {
       // ✅ Admin approval for high-budget or special events
-      evt.status = 'approved';
       evt.status = 'published';
 
       // Notify all members
@@ -725,6 +760,10 @@ class EventService {
    * @returns {object} Updated event
    */
   async update(eventId, data, files, userContext) {
+    console.log('🔧 Backend UPDATE - Received data:', Object.keys(data));
+    console.log('🔧 Backend UPDATE - participatingClubs field:', data.participatingClubs);
+    console.log('🔧 Backend UPDATE - Type of participatingClubs:', typeof data.participatingClubs);
+    
     const event = await Event.findById(eventId).populate('club');
     if (!event) {
       const err = new Error('Event not found');
@@ -745,14 +784,70 @@ class EventService {
     // Update fields
     const allowedFields = [
       'title', 'description', 'objectives', 'dateTime', 'duration',
-      'venue', 'capacity', 'expectedAttendees', 'isPublic', 'budget', 'guestSpeakers'
+      'venue', 'capacity', 'expectedAttendees', 'isPublic', 'budget', 'guestSpeakers',
+      'participatingClubs', 'allowPerformerRegistrations', 'requiresAudition'
     ];
     
     allowedFields.forEach(field => {
       if (data[field] !== undefined) {
-        event[field] = data[field];
+        // Parse JSON strings from FormData
+        if ((field === 'participatingClubs' || field === 'guestSpeakers') && typeof data[field] === 'string') {
+          try {
+            console.log(`📤 Parsing ${field} from JSON string:`, data[field]);
+            const parsed = JSON.parse(data[field]);
+            console.log('✅ Parsed result:', parsed);
+            event[field] = parsed;
+          } catch (err) {
+            console.error(`❌ Failed to parse ${field}:`, err);
+            event[field] = [];
+          }
+        }
+        // Parse boolean strings from FormData
+        else if ((field === 'requiresAudition' || field === 'allowPerformerRegistrations') && typeof data[field] === 'string') {
+          console.log(`📤 Converting ${field} from string to boolean:`, data[field]);
+          event[field] = data[field] === 'true';
+          console.log(`✅ Converted to:`, event[field]);
+        }
+        // Direct assignment for other fields
+        else {
+          event[field] = data[field];
+        }
       }
     });
+    
+    console.log('🎯 After processing - event.participatingClubs:', event.participatingClubs);
+    
+    // ✅ Update attendance records if participating clubs changed
+    if (data.participatingClubs !== undefined) {
+      // Remove all existing attendance records
+      await Attendance.deleteMany({
+        event: eventId,
+        type: 'organizer'
+      });
+      
+      // Recreate attendance for all club members
+      // IMPORTANT: Includes ALL approved members regardless of role (for promotion data)
+      const allClubIds = [event.club._id, ...(event.participatingClubs || [])];
+      
+      const clubMembers = await Membership.find({
+        club: { $in: allClubIds },
+        status: 'approved'  // NO role filtering - includes regular members too
+      }).lean();
+      
+      const attendanceRecords = clubMembers.map(member => ({
+        event: eventId,
+        user: member.user,
+        club: member.club,
+        status: 'absent',
+        type: 'organizer'
+      }));
+      
+      if (attendanceRecords.length > 0) {
+        await Attendance.insertMany(attendanceRecords, { ordered: false }).catch(err => {
+          if (err.code !== 11000) throw err;
+        });
+      }
+    }
 
     // Handle file uploads (replace existing files)
     if (files?.proposal) {
@@ -771,7 +866,13 @@ class EventService {
     // ✅ Keep status as 'draft' after editing (user can submit again for approval)
     event.status = 'draft';
 
+    console.log('💾 BEFORE SAVE - participatingClubs:', event.participatingClubs);
     await event.save();
+    console.log('✅ AFTER SAVE - Event saved successfully!');
+    
+    // Verify what was actually saved
+    const savedEvent = await Event.findById(eventId);
+    console.log('🔍 VERIFICATION - participatingClubs in DB:', savedEvent.participatingClubs);
 
     // Audit log
     await auditService.log({
@@ -928,6 +1029,143 @@ class EventService {
     });
 
     return event;
+  }
+
+  /**
+   * Get club members for an event with their attendance status
+   * Returns ALL members from primary club + participating clubs (whether attendance marked or not)
+   */
+  async getEventOrganizers(eventId) {
+    const event = await Event.findById(eventId).lean();
+    
+    if (!event) {
+      const err = new Error('Event not found');
+      err.statusCode = 404;
+      throw err;
+    }
+    
+    // Get all club IDs involved
+    const allClubIds = [event.club, ...(event.participatingClubs || [])];
+    
+    // Get ALL club members from involved clubs
+    const { Membership } = require('../club/membership.model');
+    const { Club } = require('../club/club.model');
+    
+    const clubMembers = await Membership.find({
+      club: { $in: allClubIds },
+      status: 'approved'
+    })
+    .populate('user', 'profile.name email rollNumber')
+    .populate('club', 'name')
+    .lean();
+    
+    // Get existing attendance records
+    const attendanceRecords = await Attendance.find({
+      event: eventId,
+      type: 'organizer'
+    }).lean();
+    
+    // Build attendance map for quick lookup
+    const attendanceMap = {};
+    attendanceRecords.forEach(att => {
+      attendanceMap[att.user.toString()] = att.status;
+    });
+    
+    // Build member list grouped by club
+    const membersByClub = {};
+    
+    clubMembers.forEach(membership => {
+      if (!membership.user) return; // Skip if user not populated
+      
+      const clubId = membership.club._id.toString();
+      const clubName = membership.club.name;
+      const userId = membership.user._id.toString();
+      
+      if (!membersByClub[clubId]) {
+        membersByClub[clubId] = {
+          clubId,
+          clubName,
+          members: []
+        };
+      }
+      
+      membersByClub[clubId].members.push({
+        userId: membership.user._id,
+        name: membership.user.profile?.name || 'Unknown',
+        email: membership.user.email,
+        rollNumber: membership.user.rollNumber,
+        attendanceStatus: attendanceMap[userId] || 'rsvp' // Default to 'rsvp' if not marked
+      });
+    });
+    
+    // Convert to array and sort
+    return Object.values(membersByClub).map(group => {
+      group.members.sort((a, b) => a.name.localeCompare(b.name));
+      return group;
+    });
+  }
+
+  /**
+   * Update organizer attendance (bulk update)
+   * @param {string} eventId - Event ID
+   * @param {Array} attendance - Array of {userId, status} objects
+   */
+  async updateOrganizerAttendance(eventId, attendance, userContext) {
+    const event = await Event.findById(eventId);
+    if (!event) {
+      const err = new Error('Event not found');
+      err.statusCode = 404;
+      throw err;
+    }
+    
+    // Validate attendance array
+    if (!Array.isArray(attendance) || attendance.length === 0) {
+      const err = new Error('Invalid attendance data');
+      err.statusCode = 400;
+      throw err;
+    }
+    
+    // Update each attendance record
+    const updates = attendance.map(async ({ userId, status }) => {
+      // Validate status
+      if (!['present', 'absent'].includes(status)) {
+        throw new Error(`Invalid status: ${status}`);
+      }
+      
+      // Update or create attendance record
+      const result = await Attendance.findOneAndUpdate(
+        {
+          event: eventId,
+          user: userId,
+          type: { $in: ['organizer', 'volunteer'] }
+        },
+        {
+          status,
+          checkInTime: status === 'present' ? new Date() : null
+        },
+        { new: true, upsert: false }
+      );
+      
+      if (!result) {
+        throw new Error(`Attendance record not found for user ${userId}`);
+      }
+      
+      return result;
+    });
+    
+    await Promise.all(updates);
+    
+    // Audit log
+    await auditService.log({
+      user: userContext.id,
+      action: 'ORGANIZER_ATTENDANCE_UPDATE',
+      target: `Event:${eventId}`,
+      newValue: { attendance },
+      ip: userContext.ip,
+      userAgent: userContext.userAgent
+    });
+    
+    return { message: 'Attendance updated successfully' };
   }
 }
 

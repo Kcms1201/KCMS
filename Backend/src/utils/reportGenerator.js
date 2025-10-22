@@ -51,21 +51,36 @@ class ReportGenerator {
         doc.moveDown();
 
         // Budget Section
-        if (budgetData && budgetData.length > 0) {
-          doc.fontSize(14)
-             .text('Budget Overview', { underline: true })
-             .fontSize(12);
+        doc.fontSize(14)
+           .text('Budget Overview', { underline: true })
+           .fontSize(12);
 
+        if (budgetData && budgetData.length > 0) {
+          let totalBudget = 0;
           budgetData.forEach(budget => {
-            doc.text(`• ${budget.title} - ₹${budget.amount}`)
+            totalBudget += budget.amount || 0;
+            doc.text(`• ${budget.title}`)
+              .text(`  Amount: ₹${budget.amount}`)
               .text(`  Status: ${budget.status}`)
               .moveDown(0.5);
           });
+          
+          doc.moveDown();
+          doc.fontSize(13)
+             .fillColor('blue')
+             .text(`Total Budget: ₹${totalBudget}`, { align: 'right' })
+             .fillColor('black');
+        } else {
+          doc.text('No budget requests for this period.');
         }
+
+        doc.moveDown(2);
 
         // Footer
         doc.fontSize(10)
-           .text(`Report generated on: ${new Date().toLocaleString()}`, { align: 'center' });
+           .fillColor('gray')
+           .text(`Report generated on: ${new Date().toLocaleString()}`, { align: 'center' })
+           .fillColor('black');
 
         doc.end();
       } catch (error) {

@@ -134,6 +134,26 @@ const INDEXES = [
       { keys: { status: 1 }, options: { name: 'idx_status' } },
       { keys: { approvedBy: 1 }, options: { name: 'idx_approvedBy' } }
     ]
+  },
+  
+  // Unsubscribe Preferences collection (Workplan Line 368)
+  {
+    collection: 'unsubscribes',
+    indexes: [
+      { keys: { user: 1 }, options: { unique: true, name: 'idx_user' } },
+      { keys: { unsubscribeToken: 1 }, options: { unique: true, name: 'idx_token' } },
+      { keys: { email: 1 }, options: { name: 'idx_email' } }
+    ]
+  },
+  
+  // Push Subscriptions collection (Workplan Line 373: Browser push notifications)
+  {
+    collection: 'pushsubscriptions',
+    indexes: [
+      { keys: { user: 1, active: 1 }, options: { name: 'idx_user_active' } },
+      { keys: { 'subscription.endpoint': 1 }, options: { unique: true, name: 'idx_endpoint' } },
+      { keys: { active: 1 }, options: { name: 'idx_active' } }
+    ]
   }
 ];
 

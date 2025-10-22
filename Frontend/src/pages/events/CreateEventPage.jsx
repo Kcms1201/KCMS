@@ -13,7 +13,9 @@ const CreateEventPage = () => {
   const clubIdFromUrl = searchParams.get('clubId'); // ✅ Read clubId from URL
   const { user, clubMemberships } = useAuth();
   const [myClubs, setMyClubs] = useState([]);
-  const [clubsLoading, setClubsLoading] = useState(true); // ✅ Track loading state
+  const [allClubs, setAllClubs] = useState([]); // For participating clubs selection
+  const [clubsLoading, setClubsLoading] = useState(true);
+  const [selectedParticipatingClubs, setSelectedParticipatingClubs] = useState([]);
   const [formData, setFormData] = useState({
     clubId: clubIdFromUrl || '', // ✅ Pre-fill with URL clubId if available
     name: '',
@@ -28,6 +30,8 @@ const CreateEventPage = () => {
     isPublic: true,
     budget: '',
     guestSpeakers: '',
+    requiresAudition: false,
+    allowPerformerRegistrations: true,
   });
   const [files, setFiles] = useState({
     proposal: null,
@@ -49,12 +53,14 @@ const CreateEventPage = () => {
       // So we access: response.data?.clubs (NOT response.data?.data?.clubs)
       const allClubs = response.data?.clubs || [];
       
+      // Store all clubs for participating clubs dropdown
+      setAllClubs(allClubs);
+      
       // ✅ Admins and Coordinators can see ALL clubs
       if (user?.roles?.global === 'admin' || user?.roles?.global === 'coordinator') {
         setMyClubs(allClubs);
       } else {
-        // ✅ Students see only clubs where they have management role (president, vicePresident, or core team)
-        // Use clubMemberships from AuthContext (SINGLE SOURCE OF TRUTH)
+        // ✅ Students see only clubs where they have management role
         const managedClubIds = (clubMemberships || [])
           .filter(membership => CORE_AND_LEADERSHIP.includes(membership.role))
           .map(membership => membership.club?._id?.toString() || membership.club?.toString());
@@ -128,6 +134,15 @@ const CreateEventPage = () => {
         const speakers = formData.guestSpeakers.split(',').map(s => s.trim());
         formDataToSend.append('guestSpeakers', JSON.stringify(speakers));
       }
+
+      // Append participating clubs
+      if (selectedParticipatingClubs.length > 0) {
+        formDataToSend.append('participatingClubs', JSON.stringify(selectedParticipatingClubs));
+      }
+      
+      // Append audition and registration settings
+      formDataToSend.append('requiresAudition', formData.requiresAudition);
+      formDataToSend.append('allowPerformerRegistrations', formData.allowPerformerRegistrations);
 
       // Append files
       if (files.proposal) formDataToSend.append('proposal', files.proposal);
@@ -366,6 +381,76 @@ const CreateEventPage = () => {
                 onChange={handleChange}
                 placeholder="e.g., Dr. John Doe, Prof. Jane Smith"
               />
+            </div>
+
+            {/* Club Collaboration Section */}
+            <div className="form-section">
+              <h3>🤝 Club Collaboration</h3>
+              <p className="section-description">
+                Select additional clubs participating in this event.
+                <br/><strong>Note:</strong> All members from selected clubs will be automatically tracked for attendance.
+              </p>
+              
+              <div className="form-group">
+                <label htmlFor="participatingClubs">Participating Clubs (Optional)</label>
+                <select 
+                  multiple 
+                  id="participatingClubs"
+                  value={selectedParticipatingClubs}
+                  onChange={(e) => {
+                    const values = Array.from(e.target.selectedOptions, option => option.value);
+                    console.log('✅ CreateEvent - Selected clubs:', values);
+                    console.log('📊 CreateEvent - Number selected:', values.length);
+                    setSelectedParticipatingClubs(values);
+                  }}
+                  className="multi-select"
+                  size="5"
+                >
+                  {allClubs
+                    .filter(club => club._id !== formData.clubId) // Don't show primary club
+                    .map(club => (
+                      <option key={club._id} value={club._id}>
+                        {club.name}
+                      </option>
+                    ))}
+                </select>
+                <small className="form-hint">
+                  Hold Ctrl (Cmd on Mac) to select multiple. Selected: {selectedParticipatingClubs.length} clubs
+                </small>
+              </div>
+            </div>
+
+            {/* Registration Settings */}
+            <div className="form-section">
+              <h3>📝 Registration Settings</h3>
+              
+              <div className="form-group">
+                <label>
+                  <input
+                    type="checkbox"
+                    name="allowPerformerRegistrations"
+                    checked={formData.allowPerformerRegistrations}
+                    onChange={handleChange}
+                  />
+                  <span>Allow student performer registrations</span>
+                </label>
+                <small className="form-hint">Students can register to perform in this event</small>
+              </div>
+
+              {formData.allowPerformerRegistrations && (
+                <div className="form-group">
+                  <label>
+                    <input
+                      type="checkbox"
+                      name="requiresAudition"
+                      checked={formData.requiresAudition}
+                      onChange={handleChange}
+                    />
+                    <span>Requires audition for performers</span>
+                  </label>
+                  <small className="form-hint">Performers must pass audition to be approved</small>
+                </div>
+              )}
             </div>
 
             <div className="form-group">

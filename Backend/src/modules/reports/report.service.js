@@ -13,13 +13,35 @@ class ReportService {
   async dashboard() {
     const now = new Date();
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-    const clubsCount = await Club.countDocuments({ status: 'active' });
-    const membersCount = await Membership.countDocuments({ status: 'approved' });
+    
+    // Get total counts
+    const totalClubs = await Club.countDocuments({ status: 'active' });
+    const totalStudents = await Membership.countDocuments({ status: 'approved' });
+    const totalEvents = await Event.countDocuments(); // All events ever created
+    
+    // Get this month's stats
     const eventsThisMonth = await Event.countDocuments({
-      dateTime: { $gte: monthStart, $lt: now }
+      dateTime: { $gte: monthStart, $lte: now }
     });
+    
+    const newMembersThisMonth = await Membership.countDocuments({
+      joinedAt: { $gte: monthStart, $lte: now },
+      status: 'approved'
+    });
+    
+    // Get pending approvals
     const pendingClubs = await Club.countDocuments({ status: 'pending_approval' });
-    const pendingEvents = await Event.countDocuments({ status: 'pending_coordinator' });
+    const pendingEvents = await Event.countDocuments({ 
+      status: { $in: ['pending_coordinator', 'pending_admin'] }
+    });
+    const pendingApprovals = pendingClubs + pendingEvents;
+    
+    // Get active recruitments (scheduled or in_progress)
+    const activeRecruitments = await Recruitment.countDocuments({
+      status: { $in: ['scheduled', 'in_progress'] }
+    });
+    
+    // Get recruitment summary (for detailed stats if needed)
     const recruitmentStatuses = await Recruitment.aggregate([
       { $group: { _id: '$status', count: { $sum: 1 } } }
     ]);
@@ -27,9 +49,16 @@ class ReportService {
     recruitmentStatuses.forEach(r => recruitmentSummary[r._id] = r.count);
 
     return {
-      clubsCount,
-      membersCount,
+      // Field names matching frontend expectations
+      totalClubs,
+      totalStudents,
+      totalEvents,
+      activeRecruitments,
       eventsThisMonth,
+      newMembersThisMonth,
+      pendingApprovals,
+      
+      // Additional detailed info
       pendingClubs,
       pendingEvents,
       recruitmentSummary
@@ -157,13 +186,125 @@ class ReportService {
       status: br.status
     }));
 
-    const fileName = `club-activity-${club.name}-${year}.pdf`;
-    return await reportGenerator.generateAndUploadReport(
-      'club-activity',
-      { clubData, eventData, memberData, budgetData },
-      fileName,
-      { folder: `reports/${year}/clubs` }
+    // Generate PDF buffer directly instead of uploading
+    return await reportGenerator.generateClubActivityReport(
+      clubData,
+      eventData,
+      memberData,
+      budgetData
     );
+  }
+
+  /**
+   * Generate Club Activity Report as Excel
+   */
+  async generateClubActivityExcel({ clubId, year }) {
+    const club = await Club.findById(clubId).populate('coordinator', 'profile.name');
+    if (!club) {
+      const err = new Error('Club not found');
+      err.statusCode = 404;
+      throw err;
+    }
+
+    const startDate = new Date(year, 0, 1);
+    const endDate = new Date(year + 1, 0, 1);
+
+    const [events, members, budgetRequests] = await Promise.all([
+      Event.find({ 
+        club: clubId, 
+        dateTime: { $gte: startDate, $lt: endDate } 
+      }).lean(),
+      
+      Membership.find({ 
+        club: clubId, 
+        status: 'approved' 
+      }).populate('user', 'profile.name rollNumber').lean(),
+      
+      BudgetRequest.find({
+        event: { $in: await Event.find({ club: clubId }).distinct('_id') },
+        createdAt: { $gte: startDate, $lt: endDate }
+      }).populate('event', 'title').lean()
+    ]);
+
+    // Generate Excel using ExcelJS
+    const ExcelJS = require('exceljs');
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Club Activity Report');
+
+    // === SUMMARY SECTION ===
+    worksheet.mergeCells('A1:F1');
+    worksheet.getCell('A1').value = `${club.name} - Activity Report ${year}`;
+    worksheet.getCell('A1').font = { size: 16, bold: true };
+    worksheet.getCell('A1').alignment = { horizontal: 'center' };
+    worksheet.addRow([]);
+
+    // Club Summary
+    worksheet.addRow(['Club Information']);
+    worksheet.getRow(3).font = { bold: true, size: 12 };
+    worksheet.addRow(['Club Name', club.name]);
+    worksheet.addRow(['Category', club.category]);
+    worksheet.addRow(['Coordinator', club.coordinator?.profile?.name || 'N/A']);
+    worksheet.addRow(['Total Members', members.length]);
+    worksheet.addRow(['Total Events', events.length]);
+    worksheet.addRow(['Total Budget', `₹${budgetRequests.reduce((sum, br) => sum + (br.amount || 0), 0)}`]);
+    worksheet.addRow([]);
+
+    // === EVENTS SECTION ===
+    worksheet.addRow(['Events List']);
+    worksheet.getRow(worksheet.lastRow.number).font = { bold: true, size: 12 };
+    
+    // Events header
+    const eventsHeaderRow = worksheet.addRow(['Event Title', 'Date', 'Status', 'Attendees', 'Budget']);
+    eventsHeaderRow.font = { bold: true };
+    eventsHeaderRow.fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FFE0E0E0' }
+    };
+
+    // Events data
+    events.forEach(event => {
+      worksheet.addRow([
+        event.title,
+        new Date(event.dateTime).toLocaleDateString(),
+        event.status,
+        event.expectedAttendees || 0,
+        event.budget ? `₹${event.budget}` : 'N/A'
+      ]);
+    });
+
+    worksheet.addRow([]);
+
+    // === BUDGET SECTION ===
+    if (budgetRequests.length > 0) {
+      worksheet.addRow(['Budget Requests']);
+      worksheet.getRow(worksheet.lastRow.number).font = { bold: true, size: 12 };
+      
+      const budgetHeaderRow = worksheet.addRow(['Event', 'Amount', 'Status']);
+      budgetHeaderRow.font = { bold: true };
+      budgetHeaderRow.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFE0E0E0' }
+      };
+
+      budgetRequests.forEach(br => {
+        worksheet.addRow([
+          br.event?.title || 'Unknown Event',
+          `₹${br.amount}`,
+          br.status
+        ]);
+      });
+    }
+
+    // Set column widths
+    worksheet.getColumn(1).width = 30;
+    worksheet.getColumn(2).width = 15;
+    worksheet.getColumn(3).width = 15;
+    worksheet.getColumn(4).width = 15;
+    worksheet.getColumn(5).width = 15;
+
+    return await workbook.xlsx.writeBuffer();
   }
 
   /**
@@ -235,12 +376,12 @@ class ReportService {
       attendees: event.expectedAttendees || 0
     }));
 
-    const fileName = `annual-report-${year}.pdf`;
-    return await reportGenerator.generateAndUploadReport(
-      'annual',
-      { year, summaryData, topClubs, topEvents },
-      fileName,
-      { folder: `reports/${year}` }
+    // Generate PDF buffer directly instead of uploading
+    return await reportGenerator.generateAnnualReport(
+      year,
+      summaryData,
+      topClubs,
+      topEvents
     );
   }
 
@@ -274,12 +415,10 @@ class ReportService {
       clubName: event.club.name
     };
 
-    const fileName = `attendance-${event.title.replace(/[^a-zA-Z0-9]/g, '-')}-${eventId}.xlsx`;
-    return await reportGenerator.generateAndUploadReport(
-      'attendance',
-      { attendanceData, eventInfo },
-      fileName,
-      { folder: `reports/attendance/${new Date().getFullYear()}` }
+    // Generate Excel buffer directly instead of uploading
+    return await reportGenerator.generateAttendanceReport(
+      attendanceData,
+      eventInfo
     );
   }
 }

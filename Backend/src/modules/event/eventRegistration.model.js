@@ -26,16 +26,28 @@ const EventRegistrationSchema = new mongoose.Schema(
       required: true,
       default: 'audience'
     },
-    club: { 
+    representingClub: { 
       type: mongoose.Types.ObjectId, 
       ref: 'Club',
-      // Required only for performer registrations
+      // Which club the student is representing/performing for
+      // Required for performer registrations
     },
     performanceType: String, // e.g., "Dance", "Singing", "Drama"
     performanceDescription: String, // What they want to perform
+    
+    // Audition workflow
+    auditionStatus: {
+      type: String,
+      enum: ['not_required', 'pending_audition', 'audition_passed', 'audition_failed'],
+      default: 'not_required'
+    },
+    auditionDate: Date,
+    auditionNotes: String, // Feedback from audition
+    
+    // Final approval status
     status: {
       type: String,
-      enum: ['pending', 'approved', 'rejected'],
+      enum: ['pending', 'approved', 'rejected', 'waitlisted'],
       default: 'pending'
     },
     approvedBy: {
@@ -49,12 +61,13 @@ const EventRegistrationSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// Compound index: One registration per user per event
-EventRegistrationSchema.index({ event: 1, user: 1 }, { unique: true });
+// Compound index: One registration per user per event per club
+// Allows student to register for same event but different clubs (e.g., Dance for Club A, Singing for Club B)
+EventRegistrationSchema.index({ event: 1, user: 1, representingClub: 1 }, { unique: true });
 
 // Index for queries
 EventRegistrationSchema.index({ status: 1 });
-EventRegistrationSchema.index({ club: 1, status: 1 });
+EventRegistrationSchema.index({ representingClub: 1, status: 1 });
 EventRegistrationSchema.index({ registrationType: 1 });
 
 module.exports.EventRegistration = mongoose.model('EventRegistration', EventRegistrationSchema);

@@ -22,7 +22,6 @@ if (process.env.CLOUDINARY_URL) {
 async function uploadImage(filePath, options = {}) {
   const uploadOptions = {
     resource_type: 'image',
-    format: 'auto', // Auto-convert to best format (WebP, AVIF, etc.)
     quality: 'auto:good', // Smart quality optimization
     fetch_format: 'auto', // Deliver best format based on browser
     flags: 'progressive', // Progressive JPG loading

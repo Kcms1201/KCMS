@@ -14,8 +14,10 @@ const EventSchema = new mongoose.Schema(
     isPublic:     { type: Boolean, default: true },
     budget:       { type: Number, min: 0, default: 0 },
     guestSpeakers:[String],
-    participatingClubs: [{ type: mongoose.Types.ObjectId, ref: 'Club' }], // Clubs involved in event
-    allowPerformerRegistrations: { type: Boolean, default: false }, // Allow students to register as performers
+    participatingClubs: [{ type: mongoose.Types.ObjectId, ref: 'Club' }], // Collaborating clubs for the event
+    allowPerformerRegistrations: { type: Boolean, default: true }, // Allow students to register as performers
+    requiresAudition: { type: Boolean, default: false }, // Whether event requires auditions for performers
+    
     attachments: {
       proposalUrl:        String,
       budgetBreakdownUrl: String,

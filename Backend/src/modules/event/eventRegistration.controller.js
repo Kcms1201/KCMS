@@ -105,3 +105,34 @@ exports.cancelRegistration = async (req, res, next) => {
     next(err);
   }
 };
+
+/**
+ * Update audition status
+ */
+exports.updateAuditionStatus = async (req, res, next) => {
+  try {
+    const registration = await registrationService.updateAuditionStatus(
+      req.params.registrationId,
+      req.body,
+      { id: req.user.id, roles: req.user.roles, ip: req.ip, userAgent: req.headers['user-agent'] }
+    );
+    successResponse(res, registration, 'Audition status updated');
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * List pending auditions for a club
+ */
+exports.listPendingAuditions = async (req, res, next) => {
+  try {
+    const registrations = await registrationService.listPendingAuditions(
+      req.params.clubId,
+      req.query.eventId
+    );
+    successResponse(res, registrations, 'Pending auditions retrieved');
+  } catch (err) {
+    next(err);
+  }
+};

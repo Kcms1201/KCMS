@@ -27,6 +27,9 @@ const EventDetailPage = () => {
       // Structure: response.data = { status, data: { event } }
       const eventData = response.data?.data?.event || response.data?.event;
       
+      console.log('📋 EventDetailPage - Event data:', eventData);
+      console.log('🤝 EventDetailPage - Participating clubs:', eventData?.participatingClubs);
+      
       if (!eventData) {
         setEvent(null);
       } else {
@@ -238,6 +241,12 @@ const EventDetailPage = () => {
             </div>
             <p className="event-club-large">
               Organized by <strong>{event?.club?.name || 'Unknown Club'}</strong>
+              {event?.participatingClubs && event.participatingClubs.length > 0 && (
+                <span className="participating-clubs">
+                  {' '}in collaboration with{' '}
+                  <strong>{event.participatingClubs.map(c => c.name).join(', ')}</strong>
+                </span>
+              )}
             </p>
             <p className="event-description-large">{event?.description || 'No description available'}</p>
 
@@ -276,14 +285,13 @@ const EventDetailPage = () => {
             </div>
 
             <div className="event-actions">
-              {isPublished && !canManage && (
+              {/* ✅ NEW: Event Registration for all users (students including club members) */}
+              {isPublished && (
                 <button 
-                  onClick={handleRSVP} 
-                  className={hasRSVPd ? "btn btn-success" : "btn btn-primary"}
-                  disabled={rsvpLoading || hasRSVPd}
-                  title={hasRSVPd ? 'You have already RSVP\'d to this event' : 'Click to RSVP'}
+                  onClick={() => navigate(`/events/${id}/register`)}
+                  className="btn btn-primary"
                 >
-                  {rsvpLoading ? 'Processing...' : hasRSVPd ? '✓ Already RSVP\'d' : 'RSVP Now'}
+                  📝 Register for Event
                 </button>
               )}
               
@@ -389,6 +397,53 @@ const EventDetailPage = () => {
           />
         )}
 
+        {/* ✅ Club Member Attendance Section - For Ongoing and Published Events */}
+        {canManage && (event?.status === 'ongoing' || event?.status === 'published') && (
+          <div className="attendance-section">
+            <div className="section-header">
+              <h2>👥 Club Member Attendance</h2>
+              <p className="section-subtitle">Track attendance of all club members from participating clubs</p>
+            </div>
+            
+            <div className="attendance-info">
+              <p>All members from <strong>{event?.club?.name}</strong>
+              {event?.participatingClubs && event.participatingClubs.length > 0 && (
+                <span> and {event.participatingClubs.map(c => c.name).join(', ')}</span>
+              )} are automatically tracked for attendance.</p>
+            </div>
+            
+            <div className="attendance-actions">
+              <button 
+                onClick={() => navigate(`/events/${id}/organizer-attendance`)}
+                className="btn btn-primary"
+              >
+                📝 Manage Club Member Attendance
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Completed Event Reports */}
+        {canManage && event?.status === 'completed' && (
+          <div className="completed-event-section">
+            <h2>📊 Event Reports & Analytics</h2>
+            <div className="report-actions">
+              <button 
+                onClick={() => navigate(`/events/${id}/organizer-attendance`)}
+                className="btn btn-secondary"
+              >
+                📋 View Organizer Attendance
+              </button>
+              <button 
+                onClick={() => alert('Event summary report feature coming soon')}
+                className="btn btn-outline"
+              >
+                📄 Download Event Report
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="event-detail-content">
           <div className="info-card">
             <h3>Event Objectives</h3>
@@ -442,16 +497,6 @@ const EventDetailPage = () => {
             </div>
           )}
 
-          {canManage && (
-            <div className="info-card">
-              <h3>Management Actions</h3>
-              <div className="management-actions">
-                <button className="btn btn-outline">View Attendance</button>
-                <button className="btn btn-outline">Upload Photos</button>
-                <button className="btn btn-outline">Generate Report</button>
-              </div>
-            </div>
-          )}
         </div>
       </div>
     </Layout>

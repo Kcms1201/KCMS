@@ -14,14 +14,20 @@ import ResetPasswordPage from './pages/auth/ResetPasswordPage';
 import ClubsPage from './pages/clubs/ClubsPage';
 import ClubDetailPage from './pages/clubs/ClubDetailPage';
 import ClubDashboard from './pages/clubs/ClubDashboard';
+import ClubRegistrationsPage from './pages/clubs/ClubRegistrationsPage';
 import CreateClubPage from './pages/clubs/CreateClubPage';
 import EditClubPage from './pages/clubs/EditClubPage';
+import MemberAnalyticsPage from './pages/clubs/MemberAnalyticsPage';
+import MemberActivityDetailPage from './pages/clubs/MemberActivityDetailPage';
+import ClubMeetingsPage from './pages/clubs/ClubMeetingsPage';
 
 // Event Pages (OLD STRUCTURE)
 import EventsPage from './pages/events/EventsPage';
 import EventDetailPage from './pages/events/EventDetailPage';
+import EventRegistrationPage from './pages/events/EventRegistrationPage';
 import CreateEventPage from './pages/events/CreateEventPage';
 import EditEventPage from './pages/events/EditEventPage';
+import OrganizerAttendancePage from './pages/events/OrganizerAttendancePage';
 
 // Recruitment Pages (OLD STRUCTURE)
 import RecruitmentsPage from './pages/recruitments/RecruitmentsPage';
@@ -128,6 +134,30 @@ function App() {
             }
           />
           <Route
+            path="/clubs/:clubId/registrations"
+            element={
+              <ProtectedRoute>
+                <ClubRegistrationsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/clubs/:clubId/member-analytics"
+            element={
+              <ProtectedRoute>
+                <MemberAnalyticsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/clubs/:clubId/members/:memberId/activity"
+            element={
+              <ProtectedRoute>
+                <MemberActivityDetailPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/clubs/create"
             element={
               <ProtectedRoute requiredRole="admin">
@@ -140,6 +170,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <EditClubPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/clubs/:clubId/meetings"
+            element={
+              <ProtectedRoute>
+                <ClubMeetingsPage />
               </ProtectedRoute>
             }
           />
@@ -196,6 +234,14 @@ function App() {
             }
           />
           <Route
+            path="/events/:id/register"
+            element={
+              <ProtectedRoute>
+                <EventRegistrationPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/events/create"
             element={
               <ProtectedRoute>
@@ -208,6 +254,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <EditEventPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/events/:id/organizer-attendance"
+            element={
+              <ProtectedRoute>
+                <OrganizerAttendancePage />
               </ProtectedRoute>
             }
           />

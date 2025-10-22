@@ -68,23 +68,8 @@ class NAACReportService {
       yearWiseComparison
     });
 
-    // Upload PDF to cloud
-    const pdfUrl = await this.uploadToCloud(pdfBuffer, `NAAC-Report-${year}.pdf`, 'reports/naac');
-
-    return {
-      reportUrl: pdfUrl,
-      year,
-      generatedAt: new Date(),
-      generatedBy: userContext.id,
-      summary: {
-        totalClubs: clubActivityData.totalClubs,
-        totalEvents: eventData.totalEvents,
-        totalStudentsParticipated: studentParticipationData.uniqueStudents,
-        totalAttendance: eventData.totalAttendance,
-        criteriasCovered: Object.keys(criteriaData).length
-      },
-      criteriaData
-    };
+    // Return PDF buffer directly instead of uploading
+    return pdfBuffer;
   }
 
   /**

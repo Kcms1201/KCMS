@@ -16,16 +16,16 @@ cron.schedule('0 * * * *', async () => {
   try {
     console.log('🔄 [Cron Job 1] Checking for events to mark as ongoing...');
     
-    // TESTING MODE: Process ALL published events (remove date filter)
-    // const now = new Date();
-    // const oneDayAgo = new Date(now - 24 * 60 * 60 * 1000);
+    // ✅ PRODUCTION MODE: Only mark events as ongoing when their dateTime arrives
+    const now = new Date();
+    const oneDayAgo = new Date(now - 24 * 60 * 60 * 1000);
     
     const events = await Event.find({
-      status: 'published'
-      // dateTime: { 
-      //   $lte: now,          // Event time has passed
-      //   $gte: oneDayAgo     // Within last 24 hours
-      // }
+      status: 'published',
+      dateTime: { 
+        $lte: now,          // Event time has passed (dateTime <= now)
+        $gte: oneDayAgo     // Within last 24 hours (not too old)
+      }
     }).populate('club');
     
     if (events.length === 0) {
@@ -77,12 +77,12 @@ cron.schedule('30 * * * *', async () => { // TESTING: Every minute (change back 
     console.log('🔄 [Cron Job 2] Checking events to move to pending_completion...');
     
     const now = new Date();
-    // TESTING MODE: Process ALL ongoing events (remove date filter)
-    // const oneDayAgo = new Date(now - 24 * 60 * 60 * 1000);
+    // ✅ PRODUCTION MODE: Only move to pending_completion 24hrs after event
+    const oneDayAgo = new Date(now - 24 * 60 * 60 * 1000);
     
     const events = await Event.find({
-      status: 'ongoing'
-      // dateTime: { $lt: oneDayAgo } // COMMENTED OUT FOR TESTING
+      status: 'ongoing',
+      dateTime: { $lt: oneDayAgo } // Event was more than 24 hours ago
     }).populate('club');
     
     if (events.length === 0) {

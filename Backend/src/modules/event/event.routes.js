@@ -154,4 +154,31 @@ router.post(
   ctrl.uploadCompletionMaterials
 );
 
+// Get Event Organizers (with attendance status)
+router.get(
+  '/:id/organizers',
+  authenticate,
+  requireAssignedCoordinatorOrClubRoleForEvent(CORE_AND_PRESIDENT), // ✅ Event managers can view
+  validate(v.eventId, 'params'),
+  ctrl.getEventOrganizers
+);
+
+// Update Organizer Attendance (bulk update)
+router.post(
+  '/:id/organizer-attendance',
+  authenticate,
+  requireAssignedCoordinatorOrClubRoleForEvent(CORE_AND_PRESIDENT), // ✅ Event managers can update
+  validate(v.eventId, 'params'),
+  ctrl.updateOrganizerAttendance
+);
+
+// Generate Attendance Report (JSON or CSV)
+router.get(
+  '/:id/attendance-report',
+  authenticate,
+  requireAssignedCoordinatorOrClubRoleForEvent(CORE_AND_PRESIDENT), // ✅ Event managers can generate
+  validate(v.eventId, 'params'),
+  ctrl.generateAttendanceReport
+);
+
 module.exports = router;

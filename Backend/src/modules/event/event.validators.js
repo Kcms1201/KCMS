@@ -10,14 +10,36 @@ module.exports = {
     title: Joi.string().max(100).required(),
     description: Joi.string().max(1000).optional(),
     objectives: Joi.string().max(500).optional(),
-    dateTime: Joi.date().required(),
+    dateTime: Joi.date()
+      .required()
+      .min('now')
+      .messages({
+        'date.min': 'Event date must be in the future',
+        'date.base': 'Invalid date format',
+        'any.required': 'Event date is required'
+      }),
     duration: Joi.number().min(0).required(),
     venue: Joi.string().max(200).optional(),
     capacity: Joi.number().min(0).optional(),
     expectedAttendees: Joi.number().min(0).optional(),
     isPublic: Joi.boolean().optional(),
     budget: Joi.number().min(0).optional(),
-    guestSpeakers: Joi.array().items(Joi.string()).optional()
+    guestSpeakers: Joi.alternatives().try(
+      Joi.array().items(Joi.string()),
+      Joi.string()
+    ).optional(),
+    participatingClubs: Joi.alternatives().try(
+      Joi.array().items(objectId),
+      Joi.string()
+    ).optional(),
+    requiresAudition: Joi.alternatives().try(
+      Joi.boolean(),
+      Joi.string().valid('true', 'false')
+    ).optional(),
+    allowPerformerRegistrations: Joi.alternatives().try(
+      Joi.boolean(),
+      Joi.string().valid('true', 'false')
+    ).optional()
   }),
 
   updateEvent: Joi.object({
@@ -31,7 +53,22 @@ module.exports = {
     expectedAttendees: Joi.number().min(0).optional(),
     isPublic: Joi.boolean().optional(),
     budget: Joi.number().min(0).optional(),
-    guestSpeakers: Joi.array().items(Joi.string()).optional()
+    guestSpeakers: Joi.alternatives().try(
+      Joi.array().items(Joi.string()),
+      Joi.string()
+    ).optional(),
+    participatingClubs: Joi.alternatives().try(
+      Joi.array().items(objectId),
+      Joi.string()
+    ).optional(),
+    requiresAudition: Joi.alternatives().try(
+      Joi.boolean(),
+      Joi.string().valid('true', 'false')
+    ).optional(),
+    allowPerformerRegistrations: Joi.alternatives().try(
+      Joi.boolean(),
+      Joi.string().valid('true', 'false')
+    ).optional()
   }),
 
   list: Joi.object({

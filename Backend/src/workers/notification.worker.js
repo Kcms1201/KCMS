@@ -2,8 +2,9 @@ const { Worker } = require('bullmq');
 const appConfig = require('../config');
 const config = { connection: { url: appConfig.REDIS_URL } };
 const { Notification } = require('../modules/notification/notification.model');
-const { sendMail, sendBulkTemplatedEmail } = require('../utils/mail');
+const { sendMail, sendNotificationEmail } = require('../utils/mail');
 const { User } = require('../modules/auth/user.model');
+const { sendPushToUser, createPayloadFromNotification, isPushAvailable } = require('../utils/pushNotification');
 
 const concurrency = appConfig.NOTIFICATION_WORKER_CONCURRENCY;
 const BATCH_INTERVAL = appConfig.NOTIFICATION_BATCH_EVERY_MS || 4 * 60 * 60 * 1000; // 4 hours
@@ -28,10 +29,22 @@ const worker = new Worker(
     const notif = await Notification.findById(notifId).populate('user', 'email').lean();
     if (!notif || !notif.user?.email) return;
 
+    // Send browser push notification (if enabled and user has subscriptions)
+    if (isPushAvailable()) {
+      try {
+        const pushPayload = createPayloadFromNotification(notif);
+        await sendPushToUser(notif.user._id, pushPayload);
+        console.log(`📱 Push notification sent for ${notif.type}`);
+      } catch (pushError) {
+        console.error('Push notification failed:', pushError.message);
+        // Don't fail the job if push fails, continue with email
+      }
+    }
+
     if (notif.priority === 'URGENT' || notif.priority === 'HIGH') {
-      // Send immediately for URGENT and HIGH priority
+      // Send immediately for URGENT and HIGH priority (with unsubscribe for non-URGENT)
       const { subject, html, text } = renderEmail(notif);
-      await sendMail({ to: notif.user.email, subject, html, text });
+      await sendNotificationEmail(notif.user, notif.type, notif.priority, { subject, html, text });
       await Notification.findByIdAndUpdate(notifId, { emailSent: true, emailSentAt: new Date() });
     } else {
       // Queue for batch processing (MEDIUM and LOW priority)
@@ -77,25 +90,54 @@ async function processBatchedNotifications() {
     
     // Send batched emails
     let successCount = 0;
+    const { Unsubscribe } = require('../modules/notification/unsubscribe.model');
+    
     for (const [email, data] of Object.entries(userNotifications)) {
       try {
         const { user, notifications } = data;
         
+        // Get or create unsubscribe preferences
+        const prefs = await Unsubscribe.getOrCreatePreferences(user._id, email);
+        
+        // Filter out notifications user has unsubscribed from
+        const allowedNotifications = notifications.filter(n => !prefs.hasUnsubscribed(n.type));
+        
+        if (allowedNotifications.length === 0) {
+          console.log(`User ${email} has unsubscribed from all batched notifications`);
+          // Mark as sent even though we didn't send (user opted out)
+          const notifIds = notifications.map(n => n._id);
+          await Notification.updateMany(
+            { _id: { $in: notifIds } },
+            { emailSent: false, emailSkipped: true, emailSkippedReason: 'unsubscribed' }
+          );
+          continue;
+        }
+        
         // Build batch email content
-        const subject = `KMIT Clubs Hub - ${notifications.length} New Notification${notifications.length > 1 ? 's' : ''}`;
-        const html = buildBatchEmailHtml(user, notifications);
-        const text = buildBatchEmailText(user, notifications);
+        const subject = `KMIT Clubs Hub - ${allowedNotifications.length} New Notification${allowedNotifications.length > 1 ? 's' : ''}`;
+        const html = buildBatchEmailHtml(user, allowedNotifications, prefs.unsubscribeToken);
+        const text = buildBatchEmailText(user, allowedNotifications);
         
         await sendMail({ to: email, subject, html, text });
         
         // Mark notifications as sent
-        const notifIds = notifications.map(n => n._id);
+        const notifIds = allowedNotifications.map(n => n._id);
         await Notification.updateMany(
           { _id: { $in: notifIds } },
           { emailSent: true, emailSentAt: new Date() }
         );
         
-        successCount += notifications.length;
+        // Mark filtered notifications as skipped
+        const skippedNotifs = notifications.filter(n => !allowedNotifications.includes(n));
+        if (skippedNotifs.length > 0) {
+          const skippedIds = skippedNotifs.map(n => n._id);
+          await Notification.updateMany(
+            { _id: { $in: skippedIds } },
+            { emailSent: false, emailSkipped: true, emailSkippedReason: 'unsubscribed' }
+          );
+        }
+        
+        successCount += allowedNotifications.length;
       } catch (error) {
         console.error(`Failed to send batch email to ${email}:`, error.message);
       }
@@ -109,8 +151,11 @@ async function processBatchedNotifications() {
 
 /**
  * Build HTML content for batch email
+ * @param {Object} user - User object
+ * @param {Array} notifications - Array of notifications
+ * @param {string} unsubscribeToken - Unsubscribe token for the user
  */
-function buildBatchEmailHtml(user, notifications) {
+function buildBatchEmailHtml(user, notifications, unsubscribeToken) {
   const notifItems = notifications.map(n => `
     <tr>
       <td style="padding: 10px; border-bottom: 1px solid #eee;">
@@ -120,6 +165,8 @@ function buildBatchEmailHtml(user, notifications) {
       </td>
     </tr>
   `).join('');
+  
+  const unsubscribeUrl = `${appConfig.FRONTEND_URL}/unsubscribe/${unsubscribeToken}`;
   
   return `
     <!DOCTYPE html>
@@ -148,6 +195,11 @@ function buildBatchEmailHtml(user, notifications) {
         </div>
         <div style="background: #f9fafb; padding: 15px; text-align: center; font-size: 12px; color: #666;">
           <p>KMIT Clubs Hub &copy; ${new Date().getFullYear()}</p>
+          <hr style="margin: 20px 0; border: none; border-top: 1px solid #e0e0e0;">
+          <p style="margin-top: 15px;">
+            You're receiving this email because you're a member of KMIT Clubs Hub.<br>
+            <a href="${unsubscribeUrl}" style="color: #666; text-decoration: underline;">Manage email preferences</a>
+          </p>
         </div>
       </div>
     </body>

@@ -6,6 +6,7 @@ import clubService from '../../services/clubService';
 import eventService from '../../services/eventService';
 import userService from '../../services/userService';
 import recruitmentService from '../../services/recruitmentService';
+import analyticsService from '../../services/analyticsService';
 import { getClubLogoUrl, getClubLogoPlaceholder } from '../../utils/imageUtils';
 import { ROLE_DISPLAY_NAMES, LEADERSHIP_ROLES, CORE_ROLES } from '../../utils/roleConstants';
 import '../../styles/ClubDashboard.css';
@@ -33,9 +34,15 @@ const ClubDashboard = () => {
   const [showEditRoleModal, setShowEditRoleModal] = useState(false);
   const [showArchiveModal, setShowArchiveModal] = useState(false);
   const [archiveReason, setArchiveReason] = useState('');
+  const [memberAnalytics, setMemberAnalytics] = useState({
+    activeMembers: 0,
+    inactiveMembers: 0,
+    avgEventsPerMember: 0
+  });
 
   useEffect(() => {
     fetchClubDashboardData();
+    fetchMemberAnalytics();
   }, [clubId]);
 
   useEffect(() => {
@@ -43,6 +50,28 @@ const ClubDashboard = () => {
       fetchMembers();
     }
   }, [activeTab, clubId]);
+
+  const fetchMemberAnalytics = async () => {
+    try {
+      const response = await analyticsService.getMemberAnalytics(clubId);
+      const analyticsData = response.data?.data || response.data || [];
+      
+      const activeCount = analyticsData.filter(m => m.isActive).length;
+      const inactiveCount = analyticsData.length - activeCount;
+      const avgEvents = analyticsData.length > 0 
+        ? (analyticsData.reduce((sum, m) => sum + (m.stats?.total || 0), 0) / analyticsData.length).toFixed(1)
+        : 0;
+      
+      setMemberAnalytics({
+        activeMembers: activeCount,
+        inactiveMembers: inactiveCount,
+        avgEventsPerMember: avgEvents
+      });
+    } catch (error) {
+      console.error('Error fetching member analytics:', error);
+      // Silently fail - analytics is not critical
+    }
+  };
 
   const fetchClubDashboardData = async () => {
     try {
@@ -414,6 +443,14 @@ const ClubDashboard = () => {
               <p>Recruit new members</p>
             </button>
             <button 
+              onClick={() => navigate(`/clubs/${clubId}/registrations`)} 
+              className="action-card action-secondary"
+            >
+              <span className="action-icon">🎭</span>
+              <h3>Event Registrations</h3>
+              <p>Approve performer registrations</p>
+            </button>
+            <button 
               onClick={() => setActiveTab('members')} 
               className="action-card action-info"
             >
@@ -509,6 +546,49 @@ const ClubDashboard = () => {
                     )}
                   </div>
                 </div>
+
+                {/* Member Analytics Widget */}
+                {canManage && (
+                  <div className="info-card member-analytics-widget">
+                    <div className="widget-header">
+                      <h3>📊 Member Activity</h3>
+                      <button 
+                        onClick={() => navigate(`/clubs/${clubId}/member-analytics`)}
+                        className="btn-link"
+                      >
+                        View Full Analytics →
+                      </button>
+                    </div>
+                    <div className="analytics-quick-stats">
+                      <div className="quick-stat">
+                        <span className="stat-icon success">✅</span>
+                        <div className="stat-info">
+                          <p className="stat-label">Active Members</p>
+                          <p className="stat-value">{memberAnalytics.activeMembers}</p>
+                        </div>
+                      </div>
+                      <div className="quick-stat">
+                        <span className="stat-icon warning">⚠️</span>
+                        <div className="stat-info">
+                          <p className="stat-label">Inactive Members</p>
+                          <p className="stat-value">{memberAnalytics.inactiveMembers}</p>
+                        </div>
+                      </div>
+                      <div className="quick-stat">
+                        <span className="stat-icon info">📈</span>
+                        <div className="stat-info">
+                          <p className="stat-label">Avg Events/Member</p>
+                          <p className="stat-value">{memberAnalytics.avgEventsPerMember}</p>
+                        </div>
+                      </div>
+                    </div>
+                    {memberAnalytics.inactiveMembers > 0 && (
+                      <div className="analytics-alert">
+                        <p>⚠️ {memberAnalytics.inactiveMembers} members have participated in fewer than 3 events</p>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           )}
