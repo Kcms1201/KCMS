@@ -47,6 +47,14 @@ const CreateRecruitmentPage = () => {
           managedClubIds.includes(club._id?.toString())
         );
         setMyClubs(managedClubs);
+        
+        // ✅ AUTO-SELECT if user has exactly ONE managed club
+        if (managedClubs.length === 1) {
+          setFormData(prev => ({
+            ...prev,
+            club: managedClubs[0]._id
+          }));
+        }
       }
     } catch (error) {
       console.error('Error fetching clubs:', error);
@@ -83,16 +91,29 @@ const CreateRecruitmentPage = () => {
     setLoading(true);
     setError('');
 
+    // Validation: Check if club is selected
+    if (!formData.club) {
+      setError('Please select a club to create recruitment');
+      setLoading(false);
+      return;
+    }
+
     try {
+      // Prepare data - exclude positions since backend expects array of position names, not count
+      const { positions, ...formDataWithoutPositions } = formData;
+      
       const dataToSend = {
-        ...formData,
+        ...formDataWithoutPositions,
         customQuestions: customQuestions.filter(q => q.trim() !== ''),
       };
 
+      console.log('Creating recruitment with data:', dataToSend);
       const response = await recruitmentService.create(dataToSend);
+      console.log('Recruitment created successfully:', response);
       alert('Recruitment created successfully!');
       navigate(`/recruitments/${response.data.recruitment._id}`);
     } catch (err) {
+      console.error('Error creating recruitment:', err);
       setError(err.response?.data?.message || 'Failed to create recruitment. Please try again.');
     } finally {
       setLoading(false);
@@ -119,6 +140,7 @@ const CreateRecruitmentPage = () => {
                 value={formData.club}
                 onChange={handleChange}
                 required
+                disabled={myClubs.length === 1}
               >
                 <option value="">Choose a club</option>
                 {myClubs.map((club) => (
@@ -127,6 +149,16 @@ const CreateRecruitmentPage = () => {
                   </option>
                 ))}
               </select>
+              {myClubs.length === 1 && (
+                <small className="form-hint">
+                  ✓ Auto-selected (you manage only one club)
+                </small>
+              )}
+              {myClubs.length === 0 && (
+                <small className="form-hint error-text">
+                  You don't have permission to create recruitments for any club
+                </small>
+              )}
             </div>
 
             <div className="form-group">
@@ -248,10 +280,19 @@ const CreateRecruitmentPage = () => {
               >
                 Cancel
               </button>
-              <button type="submit" className="btn btn-primary" disabled={loading}>
+              <button 
+                type="submit" 
+                className="btn btn-primary" 
+                disabled={loading || myClubs.length === 0}
+              >
                 {loading ? 'Creating...' : 'Create Recruitment'}
               </button>
             </div>
+            {myClubs.length === 0 && (
+              <div className="alert alert-warning" style={{ marginTop: '1rem' }}>
+                You need to be a core member or leadership of at least one club to create recruitments.
+              </div>
+            )}
           </form>
         </div>
       </div>

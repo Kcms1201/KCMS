@@ -1,15 +1,17 @@
+
 /* Layout Styles */
 .layout {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  background: #e8ecf1;
 }
 
 /* Navbar Dashboard */
 .navbar-dashboard {
-  background: white;
-  border-bottom: 1px solid var(--border-color);
-  box-shadow: var(--shadow-sm);
+  background: var(--harbor);
+  border-bottom: 1px solid rgba(114, 163, 191, 0.2);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
   position: sticky;
   top: 0;
   z-index: 100;
@@ -34,7 +36,7 @@
 .navbar-dashboard .logo {
   font-size: 1.25rem;
   font-weight: 700;
-  color: var(--primary-color);
+  color: white;
   text-decoration: none;
 }
 
@@ -45,7 +47,7 @@
 }
 
 .nav-link {
-  color: var(--text-secondary);
+  color: rgba(255, 255, 255, 0.8);
   text-decoration: none;
   font-weight: 500;
   font-size: 0.9375rem;
@@ -54,7 +56,7 @@
 }
 
 .nav-link:hover {
-  color: var(--primary-color);
+  color: var(--glacier);
 }
 
 .navbar-right {
@@ -75,11 +77,17 @@
 }
 
 .icon-btn:hover {
-  background-color: var(--light-color);
+  background-color: rgba(114, 163, 191, 0.2);
 }
 
 .icon-btn .icon {
-  font-size: 1.5rem;
+  display: block;
+  color: rgba(255, 255, 255, 0.9);
+  transition: color 0.2s;
+}
+
+.icon-btn:hover .icon {
+  color: white;
 }
 
 .icon-btn .badge {
@@ -274,10 +282,10 @@
 }
 
 .no-notif-icon {
-  font-size: 3rem;
   opacity: 0.3;
   display: block;
-  margin-bottom: 0.75rem;
+  margin: 0 auto 0.75rem;
+  color: var(--text-secondary);
 }
 
 .no-notifications p {
@@ -329,7 +337,7 @@
 }
 
 .user-btn:hover {
-  background-color: var(--light-color);
+  background-color: rgba(114, 163, 191, 0.2);
 }
 
 .user-avatar {
@@ -347,7 +355,7 @@
 
 .user-name {
   font-weight: 500;
-  color: var(--text-primary);
+  color: white;
   font-size: 0.9375rem;
 }
 
@@ -426,16 +434,17 @@
   max-width: 1400px;
   width: 100%;
   margin: 0 auto;
-  padding: 2rem 1rem;
+  padding: 0;
+  background: var(--light-color);
 }
 
 /* Footer Dashboard */
 .footer-dashboard {
-  background: white;
-  border-top: 1px solid var(--border-color);
+  background: var(--harbor);
+  border-top: 1px solid rgba(114, 163, 191, 0.2);
   padding: 1.5rem 0;
   text-align: center;
-  color: var(--text-secondary);
+  color: rgba(255, 255, 255, 0.7);
   font-size: 0.875rem;
 }
 

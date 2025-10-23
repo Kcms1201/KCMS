@@ -104,7 +104,7 @@ const RecruitmentsPage = () => {
                   <div className="recruitment-header">
                     <div>
                       <h3>{recruitment.title}</h3>
-                      <p className="club-name">{recruitment.clubId?.name || 'Unknown Club'}</p>
+                      <p className="club-name">{recruitment.club?.name || 'Unknown Club'}</p>
                     </div>
                     <span className={`badge ${getStatusBadgeClass(recruitment.status)}`}>
                       {recruitment.status}
@@ -128,10 +128,10 @@ const RecruitmentsPage = () => {
                         </span>
                       </div>
                     )}
-                    {recruitment.positions && (
+                    {recruitment.positions && recruitment.positions.length > 0 && (
                       <div className="meta-item">
                         <span className="meta-icon">👥</span>
-                        <span>{recruitment.positions} positions</span>
+                        <span>{recruitment.positions.length} position{recruitment.positions.length !== 1 ? 's' : ''}</span>
                       </div>
                     )}
                   </div>

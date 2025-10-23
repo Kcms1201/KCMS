@@ -47,12 +47,21 @@ class RecruitmentService {
 
     if (action === 'schedule' && prevStatus === 'draft') {
       rec.status = 'scheduled';
-      await notificationService.create({
-        user: rec.coordinator,
-        type: 'approval_required',
-        payload: { recruitmentId: id, title: rec.title },
-        priority: 'HIGH'
-      });
+      // Notify club core members about scheduled recruitment
+      const coreMembers = await Membership.find({
+        club: rec.club,
+        status: 'approved',
+        role: { $in: ['president', 'vicePresident', 'core', 'secretary'] }
+      }).distinct('user');
+      
+      await Promise.all(coreMembers.map(uid =>
+        notificationService.create({
+          user: uid,
+          type: 'approval_required',
+          payload: { recruitmentId: id, title: rec.title },
+          priority: 'HIGH'
+        })
+      ));
 
     } else if (action === 'open' && prevStatus === 'scheduled') {
       rec.status = 'open';
@@ -125,11 +134,12 @@ class RecruitmentService {
     const [total, items] = await Promise.all([
       Recruitment.countDocuments(query),
       Recruitment.find(query)
+        .populate('club', 'name')
         .skip(skip)
         .limit(limit)
         .sort({ createdAt: -1 })
     ]);
-    return { total, page, limit, items };
+    return { recruitments: items, total, page, limit };
   }
 
   async getById(id, userContext) {
@@ -194,8 +204,14 @@ class RecruitmentService {
       userAgent: userContext.userAgent
     });
 
-    const cores = await Membership.find({ club: rec.club, status: 'approved' }).distinct('user');
-    await Promise.all(cores.map(uid =>
+    // Notify only core members about new application
+    const coreMembers = await Membership.find({
+      club: rec.club,
+      status: 'approved',
+      role: { $in: ['president', 'vicePresident', 'core', 'secretary', 'treasurer'] }
+    }).distinct('user');
+    
+    await Promise.all(coreMembers.map(uid =>
       notificationService.create({
         user: uid,
         type: 'application_status',
