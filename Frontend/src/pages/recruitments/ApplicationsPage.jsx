@@ -24,8 +24,9 @@ const ApplicationsPage = () => {
         recruitmentService.listApplications(id, filter !== 'all' ? { status: filter } : {}),
         recruitmentService.getById(id),
       ]);
-      setApplications(appsRes.data.applications || []);
-      setRecruitment(recruitRes.data.recruitment);
+      // Backend returns { items, total } not { applications }
+      setApplications(appsRes.data?.items || []);
+      setRecruitment(recruitRes.data?.data?.recruitment || recruitRes.data?.recruitment);
     } catch (error) {
       console.error('Error fetching applications:', error);
     } finally {
@@ -201,9 +202,9 @@ const ApplicationsPage = () => {
                 <div className="application-content">
                   <div className="application-header">
                     <div>
-                      <h3>{app.userId?.name || 'Unknown'}</h3>
+                      <h3>{app.user?.profile?.name || app.user?.email || 'Unknown'}</h3>
                       <p className="application-meta">
-                        {app.userId?.rollNumber} • {app.userId?.department} • Year {app.userId?.year}
+                        {app.user?.email} • Applied: {new Date(app.appliedAt).toLocaleDateString()}
                       </p>
                     </div>
                     <span className={`badge ${getStatusBadgeClass(app.status)}`}>
@@ -212,32 +213,15 @@ const ApplicationsPage = () => {
                   </div>
 
                   <div className="application-body">
-                    <div className="application-section">
-                      <h4>Why Join?</h4>
-                      <p>{app.whyJoin}</p>
-                    </div>
-
-                    <div className="application-section">
-                      <h4>Skills</h4>
-                      <p>{app.skills}</p>
-                    </div>
-
-                    {app.experience && (
-                      <div className="application-section">
-                        <h4>Experience</h4>
-                        <p>{app.experience}</p>
-                      </div>
-                    )}
-
-                    {app.customAnswers && Object.keys(app.customAnswers).length > 0 && (
-                      <div className="application-section">
-                        <h4>Additional Answers</h4>
-                        {Object.entries(app.customAnswers).map(([key, value]) => (
-                          <div key={key} className="custom-answer">
-                            <strong>Q{parseInt(key) + 1}:</strong> {value}
-                          </div>
-                        ))}
-                      </div>
+                    {app.answers && app.answers.length > 0 ? (
+                      app.answers.map((item, index) => (
+                        <div key={index} className="application-section">
+                          <h4>{item.question}</h4>
+                          <p>{item.answer}</p>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="no-data">No answers provided</p>
                     )}
                   </div>
 

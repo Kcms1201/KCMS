@@ -53,8 +53,8 @@ const StudentDashboard = () => {
       // Backend: successResponse(res, { total, events }) → { data: { total, events } }
       setUpcomingEvents(eventsRes.data?.events || []);
       
-      // Backend: successResponse(res, { total, items }) → { data: { total, items } }
-      setOpenRecruitments(recruitmentsRes.data?.items || []);
+      // Backend: successResponse(res, { recruitments, total }) → { data: { recruitments, total } }
+      setOpenRecruitments(recruitmentsRes.data?.recruitments || []);
 
       setStats({
         myClubsCount: studentClubs.length,

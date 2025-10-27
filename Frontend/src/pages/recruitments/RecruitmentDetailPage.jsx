@@ -70,7 +70,29 @@ const RecruitmentDetailPage = () => {
     setApplying(true);
 
     try {
-      await recruitmentService.apply(id, applicationData);
+      // Transform frontend format to backend format
+      // Backend expects: { answers: [{ question, answer }] }
+      const answers = [
+        { question: 'Why do you want to join this club?', answer: applicationData.whyJoin },
+        { question: 'Relevant Skills', answer: applicationData.skills },
+      ];
+      
+      // Add experience if provided (optional field)
+      if (applicationData.experience && applicationData.experience.trim()) {
+        answers.push({ question: 'Previous Experience', answer: applicationData.experience });
+      }
+      
+      // Add custom questions answers
+      if (recruitment.customQuestions && recruitment.customQuestions.length > 0) {
+        recruitment.customQuestions.forEach((question, index) => {
+          const answer = applicationData.customAnswers[index] || '';
+          if (answer.trim()) {
+            answers.push({ question, answer });
+          }
+        });
+      }
+      
+      await recruitmentService.apply(id, { answers });
       alert('Application submitted successfully!');
       navigate('/recruitments');
     } catch (error) {
@@ -149,8 +171,10 @@ const RecruitmentDetailPage = () => {
 
   const isOpen = recruitment.status === 'open' || recruitment.status === 'closing_soon';
   
-  // ✅ Use backend-provided permission flag (SINGLE SOURCE OF TRUTH)
+  // ✅ Use backend-provided permission flags (SINGLE SOURCE OF TRUTH)
   const canManage = recruitment?.canManage || false;
+  const hasApplied = recruitment?.hasApplied || false;
+  const userApplication = recruitment?.userApplication;
 
   return (
     <Layout>
@@ -168,7 +192,7 @@ const RecruitmentDetailPage = () => {
           </span>
         </div>
 
-        <div className="recruitment-detail-content">
+        <div className={`recruitment-detail-content ${(isOpen && !canManage && !hasApplied) ? 'two-column' : 'single-column'}`}>
           <div className="recruitment-info-section">
             <div className="info-card">
               <h3>About This Recruitment</h3>
@@ -284,7 +308,67 @@ const RecruitmentDetailPage = () => {
             )}
           </div>
 
-          {isOpen && !canManage && (
+          {/* Show Application Status if user has applied */}
+          {hasApplied && !canManage && (
+            <div className="info-card" style={{ 
+              background: '#f0fdf4', 
+              border: '2px solid #22c55e',
+              padding: '24px',
+              borderRadius: '8px'
+            }}>
+              <h3 style={{ color: '#16a34a', marginBottom: '12px' }}>
+                ✅ Application Submitted
+              </h3>
+              <p style={{ marginBottom: '16px', color: '#166534' }}>
+                You have successfully applied to this recruitment. Your application is currently under review.
+              </p>
+              <div style={{ 
+                display: 'flex', 
+                gap: '12px', 
+                padding: '12px',
+                background: 'white',
+                borderRadius: '6px',
+                fontSize: '14px'
+              }}>
+                <div style={{ flex: 1 }}>
+                  <strong>Status:</strong> 
+                  <span style={{ 
+                    marginLeft: '8px',
+                    padding: '4px 12px',
+                    background: userApplication?.status === 'selected' ? '#dcfce7' : 
+                               userApplication?.status === 'rejected' ? '#fee2e2' : '#fef3c7',
+                    color: userApplication?.status === 'selected' ? '#16a34a' : 
+                           userApplication?.status === 'rejected' ? '#dc2626' : '#ca8a04',
+                    borderRadius: '12px',
+                    fontSize: '13px',
+                    fontWeight: '500'
+                  }}>
+                    {userApplication?.status || 'submitted'}
+                  </span>
+                </div>
+                <div style={{ flex: 1 }}>
+                  <strong>Applied:</strong> {userApplication?.appliedAt ? new Date(userApplication.appliedAt).toLocaleDateString() : 'Recently'}
+                </div>
+              </div>
+              {userApplication?.status === 'selected' && (
+                <p style={{ marginTop: '12px', color: '#16a34a', fontWeight: '500' }}>
+                  🎉 Congratulations! You have been selected. You are now a member of this club!
+                </p>
+              )}
+              {userApplication?.status === 'rejected' && (
+                <p style={{ marginTop: '12px', color: '#dc2626' }}>
+                  Unfortunately, your application was not successful this time. Keep trying!
+                </p>
+              )}
+              {userApplication?.status === 'waitlisted' && (
+                <p style={{ marginTop: '12px', color: '#ca8a04' }}>
+                  You are on the waitlist. We'll notify you if a spot becomes available.
+                </p>
+              )}
+            </div>
+          )}
+
+          {isOpen && !canManage && !hasApplied && (
             <div className="application-form-section">
               <h2>Apply Now</h2>
               

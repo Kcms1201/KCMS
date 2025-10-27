@@ -164,9 +164,29 @@ class RecruitmentService {
       const hasClubRole = membership && coreRoles.includes(membership.role);
       
       data.canManage = isAdmin || hasClubRole;
+      
+      // ✅ Check if user has already applied
+      const userApplication = await Application.findOne({
+        user: userContext.id,
+        recruitment: id
+      }).lean();
+      
+      data.hasApplied = !!userApplication;
+      if (userApplication) {
+        data.userApplication = {
+          _id: userApplication._id,
+          status: userApplication.status,
+          appliedAt: userApplication.appliedAt
+        };
+      }
     } else {
       data.canManage = false;
+      data.hasApplied = false;
     }
+    
+    // ✅ Add application count for core members
+    const applicationCount = await Application.countDocuments({ recruitment: id });
+    data.applicationCount = applicationCount;
     
     return data;
   }

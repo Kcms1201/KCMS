@@ -1,6 +1,7 @@
 //src/modules/recruitment/recruitment.routes.js
 const router       = require('express').Router();
 const authenticate = require('../../middlewares/auth');
+const { optionalAuth } = require('../../middlewares/auth');
 const { 
   requireEither,
   CORE_AND_PRESIDENT,  // ✅ All core roles + president
@@ -9,6 +10,22 @@ const {
 const validate     = require('../../middlewares/validate');
 const v            = require('./recruitment.validators');
 const ctrl         = require('./recruitment.controller');
+const { Recruitment } = require('./recruitment.model');
+
+// ✅ Middleware to load recruitment and add club to req.body for permission checking
+const addRecruitmentClub = async (req, res, next) => {
+  try {
+    const recruitment = await Recruitment.findById(req.params.id).lean();
+    if (!recruitment) {
+      return res.status(404).json({ status: 'error', message: 'Recruitment not found' });
+    }
+    // Add club to req.body so permission middleware can check it
+    req.body.club = recruitment.club.toString();
+    next();
+  } catch (error) {
+    next(error);
+  }
+};
 
 // Create Recruitment (Core+ can create recruitment - Section 4.1)
 router.post(
@@ -24,9 +41,10 @@ router.post(
 router.post(
   '/:id/status',
   authenticate,
-  requireEither(['admin'], CORE_AND_PRESIDENT), // ✅ Admin OR Core+President
   validate(v.recruitmentId, 'params'),
   validate(v.lifecycleSchema),
+  addRecruitmentClub,  // ✅ Load recruitment and add club to req.body
+  requireEither(['admin'], CORE_AND_PRESIDENT, 'club'), // ✅ Check permission for club
   ctrl.changeStatus
 );
 
@@ -38,8 +56,10 @@ router.get(
 );
 
 // Get By ID (Public for open ones - Section 4.2)
+// ✅ Uses optionalAuth so logged-in users get canManage flag
 router.get(
   '/:id',
+  optionalAuth,  // ✅ Sets req.user if authenticated, doesn't fail if not
   validate(v.recruitmentId, 'params'),
   ctrl.getById
 );
@@ -57,9 +77,10 @@ router.post(
 router.get(
   '/:id/applications',
   authenticate,
-  requireEither(['admin'], CORE_AND_PRESIDENT), // ✅ Admin OR Core+President
   validate(v.recruitmentId, 'params'),
   validate(v.listSchema, 'query'),
+  addRecruitmentClub,  // ✅ Load recruitment and add club to req.body
+  requireEither(['admin'], CORE_AND_PRESIDENT, 'club'), // ✅ Check permission for club
   ctrl.listApplications
 );
 
@@ -67,9 +88,10 @@ router.get(
 router.patch(
   '/:id/applications/:appId',
   authenticate,
-  requireEither(['admin'], CORE_AND_PRESIDENT), // ✅ Admin OR Core+President
   validate(v.recruitmentIdAndAppId, 'params'),
   validate(v.reviewSchema),
+  addRecruitmentClub,  // ✅ Load recruitment and add club to req.body
+  requireEither(['admin'], CORE_AND_PRESIDENT, 'club'), // ✅ Check permission for club
   ctrl.review
 );
 
@@ -77,9 +99,10 @@ router.patch(
 router.patch(
   '/:id/applications',
   authenticate,
-  requireEither(['admin'], CORE_AND_PRESIDENT), // ✅ Admin OR Core+President
   validate(v.recruitmentId, 'params'),
   validate(v.bulkReviewSchema),
+  addRecruitmentClub,  // ✅ Load recruitment and add club to req.body
+  requireEither(['admin'], CORE_AND_PRESIDENT, 'club'), // ✅ Check permission for club
   ctrl.bulkReview
 );
 
