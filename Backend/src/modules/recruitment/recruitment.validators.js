@@ -8,24 +8,61 @@ const objectId = Joi.string().custom((v, h) =>
 
 module.exports = {
   createSchema: Joi.object({
-    club: objectId.required(),
-    title: Joi.string().max(100).required(),
-    description: Joi.string().max(1000).required(),
-    eligibility: Joi.string().max(500).optional(),
-    startDate: Joi.date().required(),
-    endDate: Joi.date().greater(Joi.ref('startDate')).required(),
-    positions: Joi.array().items(Joi.string()).optional(),
-    customQuestions: Joi.array().items(Joi.string()).max(5).optional()
+    club: objectId.required().messages({
+      'any.required': 'Club is required. Please select a club.',
+      'string.base': 'Invalid club ID format',
+      'string.empty': 'Club ID cannot be empty'
+    }),
+    title: Joi.string().max(100).required().messages({
+      'any.required': 'Recruitment title is required',
+      'string.max': 'Title cannot exceed 100 characters'
+    }),
+    description: Joi.string().max(1000).required().messages({
+      'any.required': 'Description is required',
+      'string.max': 'Description cannot exceed 1000 characters'
+    }),
+    eligibility: Joi.string().max(500).optional().messages({
+      'string.max': 'Eligibility criteria cannot exceed 500 characters'
+    }),
+    startDate: Joi.date().required().messages({
+      'any.required': 'Start date is required',
+      'date.base': 'Invalid start date format'
+    }),
+    endDate: Joi.date().greater(Joi.ref('startDate')).required().messages({
+      'any.required': 'End date is required',
+      'date.base': 'Invalid end date format',
+      'date.greater': 'End date must be after start date'
+    }),
+    positions: Joi.array().items(Joi.string()).optional().messages({
+      'array.base': 'Positions must be an array of strings'
+    }),
+    customQuestions: Joi.array().items(Joi.string()).max(5).optional().messages({
+      'array.max': 'Maximum 5 custom questions allowed'
+    })
   }),
 
   updateSchema: Joi.object({
-    title: Joi.string().max(100),
-    description: Joi.string().max(1000),
-    eligibility: Joi.string().max(500),
-    startDate: Joi.date(),
-    endDate: Joi.date(),
-    positions: Joi.array().items(Joi.string()),
-    customQuestions: Joi.array().items(Joi.string()).max(5)
+    title: Joi.string().max(100).messages({
+      'string.max': 'Title cannot exceed 100 characters'
+    }),
+    description: Joi.string().max(1000).messages({
+      'string.max': 'Description cannot exceed 1000 characters'
+    }),
+    eligibility: Joi.string().max(500).messages({
+      'string.max': 'Eligibility criteria cannot exceed 500 characters'
+    }),
+    startDate: Joi.date().messages({
+      'date.base': 'Invalid start date format'
+    }),
+    endDate: Joi.date().messages({
+      'date.base': 'Invalid end date format'
+    }),
+    positions: Joi.array().items(Joi.string()).messages({
+      'array.base': 'Positions must be an array of strings'
+    }),
+    customQuestions: Joi.array().items(Joi.string()).max(5).messages({
+      'array.max': 'Maximum 5 custom questions allowed'
+    })
   }).min(1),
 
   lifecycleSchema: Joi.object({

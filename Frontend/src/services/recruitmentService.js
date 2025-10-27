@@ -14,8 +14,8 @@ const recruitmentService = {
   },
 
   // Change Status
-  changeStatus: async (id, status) => {
-    const response = await api.post(`/recruitments/${id}/status`, { status });
+  changeStatus: async (id, action) => {
+    const response = await api.post(`/recruitments/${id}/status`, { action });
     return response.data;
   },
 

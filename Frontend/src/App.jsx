@@ -33,6 +33,7 @@ import OrganizerAttendancePage from './pages/events/OrganizerAttendancePage';
 import RecruitmentsPage from './pages/recruitments/RecruitmentsPage';
 import RecruitmentDetailPage from './pages/recruitments/RecruitmentDetailPage';
 import CreateRecruitmentPage from './pages/recruitments/CreateRecruitmentPage';
+import EditRecruitmentPage from './pages/recruitments/EditRecruitmentPage';
 import ApplicationsPage from './pages/recruitments/ApplicationsPage';
 
 // User Pages (OLD STRUCTURE)
@@ -204,6 +205,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <CreateRecruitmentPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/recruitments/:id/edit"
+            element={
+              <ProtectedRoute>
+                <EditRecruitmentPage />
               </ProtectedRoute>
             }
           />

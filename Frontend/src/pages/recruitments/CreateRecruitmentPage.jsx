@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import Layout from '../../components/Layout';
 import clubService from '../../services/clubService';
@@ -9,8 +9,11 @@ import '../../styles/Forms.css';
 
 const CreateRecruitmentPage = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, clubMemberships } = useAuth();
   const [myClubs, setMyClubs] = useState([]);
+  const [selectedClub, setSelectedClub] = useState(null); // Club details for display
+  const [clubFromUrl, setClubFromUrl] = useState(null); // clubId from URL
   const [formData, setFormData] = useState({
     club: '',
     title: '',
@@ -25,17 +28,45 @@ const CreateRecruitmentPage = () => {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    fetchMyClubs();
-  }, []);
+    // ✅ Get clubId from URL query parameter
+    const params = new URLSearchParams(location.search);
+    const clubIdFromUrl = params.get('clubId');
+    
+    if (clubIdFromUrl) {
+      setClubFromUrl(clubIdFromUrl);
+      setFormData(prev => ({ ...prev, club: clubIdFromUrl }));
+    }
+    
+    fetchMyClubs(clubIdFromUrl);
+  }, [location]);
 
-  const fetchMyClubs = async () => {
+  const fetchMyClubs = async (clubIdFromUrl) => {
     try {
       const response = await clubService.listClubs();
       const allClubs = response.data?.clubs || [];
       
+      // ✅ If clubId in URL, fetch that specific club details
+      if (clubIdFromUrl) {
+        const clubDetails = allClubs.find(c => c._id === clubIdFromUrl);
+        if (clubDetails) {
+          setSelectedClub(clubDetails);
+          setMyClubs([clubDetails]); // Only this club
+        } else {
+          setError('Club not found or you don\'t have permission to create recruitment for this club');
+        }
+        return;
+      }
+      
+      // ✅ No clubId in URL - Show dropdown (Admin/Coordinator scenario)
       // Admins and Coordinators can see ALL clubs
       if (user?.roles?.global === 'admin' || user?.roles?.global === 'coordinator') {
-        setMyClubs(allClubs);
+        // ✅ Validate all clubs have proper _id field
+        const validClubs = allClubs.filter(club => {
+          const hasValidId = club._id && typeof club._id === 'string' && club._id.length === 24;
+          return hasValidId;
+        });
+        
+        setMyClubs(validClubs);
       } else {
         // Filter clubs where user has management role (president, vicePresident, or core team)
         // Use clubMemberships from AuthContext (SINGLE SOURCE OF TRUTH)
@@ -43,9 +74,12 @@ const CreateRecruitmentPage = () => {
           .filter(membership => CORE_AND_LEADERSHIP.includes(membership.role))
           .map(membership => membership.club?._id?.toString() || membership.club?.toString());
         
-        const managedClubs = allClubs.filter(club => 
-          managedClubIds.includes(club._id?.toString())
-        );
+        const managedClubs = allClubs.filter(club => {
+          const hasValidId = club._id && typeof club._id === 'string' && club._id.length === 24;
+          const isManaged = managedClubIds.includes(club._id?.toString());
+          return hasValidId && isManaged;
+        });
+        
         setMyClubs(managedClubs);
         
         // ✅ AUTO-SELECT if user has exactly ONE managed club
@@ -57,7 +91,7 @@ const CreateRecruitmentPage = () => {
         }
       }
     } catch (error) {
-      console.error('Error fetching clubs:', error);
+      setError('Failed to load clubs. Please refresh the page.');
     }
   };
 
@@ -91,30 +125,70 @@ const CreateRecruitmentPage = () => {
     setLoading(true);
     setError('');
 
-    // Validation: Check if club is selected
-    if (!formData.club) {
+    // ✅ Enhanced Validation: Check if club is selected
+    if (!formData.club || formData.club.trim() === '') {
       setError('Please select a club to create recruitment');
       setLoading(false);
       return;
     }
 
+    // ✅ Validate club ID format (must be 24 hex characters for MongoDB ObjectId)
+    const objectIdRegex = /^[0-9a-fA-F]{24}$/;
+    if (!objectIdRegex.test(formData.club)) {
+      setError(`Invalid club selection. Please try again or contact support.`);
+      setLoading(false);
+      return;
+    }
+
+    // ✅ Validate recruitment duration (max 14 days per Workplan)
+    const startDate = new Date(formData.startDate);
+    const endDate = new Date(formData.endDate);
+    const durationDays = (endDate - startDate) / (1000 * 60 * 60 * 24);
+
+    if (durationDays > 14) {
+      setError('Recruitment duration cannot exceed 14 days (Workplan requirement)');
+      setLoading(false);
+      return;
+    }
+
+    if (durationDays < 1) {
+      setError('End date must be at least 1 day after start date');
+      setLoading(false);
+      return;
+    }
+
     try {
-      // Prepare data - exclude positions since backend expects array of position names, not count
-      const { positions, ...formDataWithoutPositions } = formData;
-      
+      // ✅ Prepare data with explicit field handling
       const dataToSend = {
-        ...formDataWithoutPositions,
+        club: formData.club, // ✅ Explicitly include club ID
+        title: formData.title,
+        description: formData.description,
+        startDate: formData.startDate,
+        endDate: formData.endDate,
         customQuestions: customQuestions.filter(q => q.trim() !== ''),
       };
 
-      console.log('Creating recruitment with data:', dataToSend);
+      // ✅ Only include optional fields if they have values
+      if (formData.eligibility && formData.eligibility.trim() !== '') {
+        dataToSend.eligibility = formData.eligibility;
+      }
+
+      // ✅ Backend expects positions as array of strings, but form has it as number
+      // Since positions is optional and we're not using it properly, we'll skip it
+      // Future: Convert to array of position names like ['President', 'Secretary']
+
       const response = await recruitmentService.create(dataToSend);
-      console.log('Recruitment created successfully:', response);
+      
       alert('Recruitment created successfully!');
       navigate(`/recruitments/${response.data.recruitment._id}`);
     } catch (err) {
-      console.error('Error creating recruitment:', err);
-      setError(err.response?.data?.message || 'Failed to create recruitment. Please try again.');
+      
+      const errorMessage = err.response?.data?.message 
+        || err.response?.data?.error 
+        || err.message 
+        || 'Failed to create recruitment. Please try again.';
+      
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -132,34 +206,59 @@ const CreateRecruitmentPage = () => {
           {error && <div className="alert alert-error">{error}</div>}
 
           <form onSubmit={handleSubmit} className="form">
-            <div className="form-group">
-              <label htmlFor="club">Select Club *</label>
-              <select
-                id="club"
-                name="club"
-                value={formData.club}
-                onChange={handleChange}
-                required
-                disabled={myClubs.length === 1}
-              >
-                <option value="">Choose a club</option>
-                {myClubs.map((club) => (
-                  <option key={club._id} value={club._id}>
-                    {club.name}
-                  </option>
-                ))}
-              </select>
-              {myClubs.length === 1 && (
-                <small className="form-hint">
-                  ✓ Auto-selected (you manage only one club)
-                </small>
-              )}
-              {myClubs.length === 0 && (
-                <small className="form-hint error-text">
-                  You don't have permission to create recruitments for any club
-                </small>
-              )}
-            </div>
+            {/* ✅ Show club name (not dropdown) when coming from club dashboard */}
+            {clubFromUrl && selectedClub ? (
+              <div className="form-group">
+                <label>Club</label>
+                <div className="static-field" style={{
+                  padding: '12px 16px',
+                  background: '#f0f9ff',
+                  border: '2px solid #0369a1',
+                  borderRadius: '8px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px'
+                }}>
+                  <span style={{ fontSize: '24px' }}>🏢</span>
+                  <div>
+                    <strong style={{ fontSize: '16px', color: '#0c4a6e' }}>{selectedClub.name}</strong>
+                    <small style={{ display: 'block', color: '#0369a1', marginTop: '4px' }}>
+                      ✓ Creating recruitment for your club
+                    </small>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              /* ✅ Show dropdown only when no clubId in URL (admin/coordinator) */
+              <div className="form-group">
+                <label htmlFor="club">Select Club *</label>
+                <select
+                  id="club"
+                  name="club"
+                  value={formData.club}
+                  onChange={handleChange}
+                  required
+                  disabled={myClubs.length === 1}
+                >
+                  <option value="">Choose a club</option>
+                  {myClubs.map((club) => (
+                    <option key={club._id} value={club._id}>
+                      {club.name}
+                    </option>
+                  ))}
+                </select>
+                {myClubs.length === 1 && (
+                  <small className="form-hint">
+                    ✓ Auto-selected (you manage only one club)
+                  </small>
+                )}
+                {myClubs.length === 0 && (
+                  <small className="form-hint error-text">
+                    You don't have permission to create recruitments for any club
+                  </small>
+                )}
+              </div>
+            )}
 
             <div className="form-group">
               <label htmlFor="title">Recruitment Title *</label>

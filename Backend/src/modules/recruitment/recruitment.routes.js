@@ -14,20 +14,11 @@ const ctrl         = require('./recruitment.controller');
 router.post(
   '/',
   authenticate,
-  requireEither(['admin'], CORE_AND_PRESIDENT), // ✅ Admin OR Core+President (Create recruitment)
+  requireEither(['admin'], CORE_AND_PRESIDENT, 'club'), // ✅ Admin OR Core+President, check 'club' field
   validate(v.createSchema),
   ctrl.create
 );
 
-// Update Recruitment (Core+ can update recruitment - Section 4.1)
-router.patch(
-  '/:id',
-  authenticate,
-  requireEither(['admin'], CORE_AND_PRESIDENT), // ✅ Admin OR Core+President
-  validate(v.recruitmentId, 'params'),
-  validate(v.updateSchema),
-  ctrl.update
-);
 
 // Schedule/Open/Close (Core+ can manage lifecycle - Section 4.1)
 router.post(

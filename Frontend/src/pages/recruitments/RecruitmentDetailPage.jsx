@@ -80,6 +80,49 @@ const RecruitmentDetailPage = () => {
     }
   };
 
+  // Status management handlers
+  const handleSchedule = async () => {
+    if (!window.confirm('Schedule this recruitment? It will be visible to students and will auto-open on the start date.')) {
+      return;
+    }
+    
+    try {
+      await recruitmentService.changeStatus(id, 'schedule');
+      alert('Recruitment scheduled successfully! It will open on ' + new Date(recruitment.startDate).toLocaleDateString());
+      fetchRecruitmentDetails(); // Reload to show updated status
+    } catch (error) {
+      alert(error.response?.data?.message || 'Failed to schedule recruitment');
+    }
+  };
+
+  const handleOpen = async () => {
+    if (!window.confirm('Open this recruitment now? All students will be notified and can start applying.')) {
+      return;
+    }
+    
+    try {
+      await recruitmentService.changeStatus(id, 'open');
+      alert('Recruitment opened successfully! Students can now apply.');
+      fetchRecruitmentDetails(); // Reload to show updated status
+    } catch (error) {
+      alert(error.response?.data?.message || 'Failed to open recruitment');
+    }
+  };
+
+  const handleClose = async () => {
+    if (!window.confirm('Close this recruitment? No more applications will be accepted.')) {
+      return;
+    }
+    
+    try {
+      await recruitmentService.changeStatus(id, 'close');
+      alert('Recruitment closed successfully! You can now review applications.');
+      fetchRecruitmentDetails(); // Reload to show updated status
+    } catch (error) {
+      alert(error.response?.data?.message || 'Failed to close recruitment');
+    }
+  };
+
   if (loading) {
     return (
       <Layout>
@@ -115,7 +158,7 @@ const RecruitmentDetailPage = () => {
         <div className="recruitment-detail-header">
           <div>
             <h1>{recruitment.title}</h1>
-            <p className="club-name-large">{recruitment.clubId?.name || 'Unknown Club'}</p>
+            <p className="club-name-large">{recruitment.club?.name || 'Unknown Club'}</p>
           </div>
           <span className={`badge badge-lg badge-${
             recruitment.status === 'open' ? 'success' : 
@@ -159,13 +202,83 @@ const RecruitmentDetailPage = () => {
             {canManage && (
               <div className="info-card">
                 <h3>Manage Recruitment</h3>
-                <div className="management-actions">
+                <div className="management-actions" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  
+                  {/* Status Management Buttons */}
+                  <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                    {recruitment.status === 'draft' && (
+                      <button 
+                        onClick={handleSchedule}
+                        className="btn btn-success"
+                        style={{ flex: '1', minWidth: '150px' }}
+                      >
+                        📅 Schedule Recruitment
+                      </button>
+                    )}
+                    
+                    {recruitment.status === 'scheduled' && (
+                      <button 
+                        onClick={handleOpen}
+                        className="btn btn-success"
+                        style={{ flex: '1', minWidth: '150px' }}
+                      >
+                        ✅ Open Now
+                      </button>
+                    )}
+                    
+                    {(recruitment.status === 'open' || recruitment.status === 'closing_soon') && (
+                      <button 
+                        onClick={handleClose}
+                        className="btn btn-warning"
+                        style={{ flex: '1', minWidth: '150px' }}
+                      >
+                        🔒 Close Recruitment
+                      </button>
+                    )}
+                    
+                    {(recruitment.status === 'draft' || recruitment.status === 'scheduled') && (
+                      <button 
+                        onClick={() => navigate(`/recruitments/${id}/edit`)}
+                        className="btn btn-secondary"
+                        style={{ flex: '1', minWidth: '150px' }}
+                      >
+                        ✏️ Edit Details
+                      </button>
+                    )}
+                  </div>
+                  
+                  {/* View Applications Button */}
                   <button 
                     onClick={() => navigate(`/recruitments/${id}/applications`)}
                     className="btn btn-primary"
                   >
-                    View Applications
+                    📋 View Applications ({recruitment.applicationCount || 0})
                   </button>
+                  
+                  {/* Status Info */}
+                  <div style={{ 
+                    padding: '12px', 
+                    background: '#f3f4f6', 
+                    borderRadius: '6px',
+                    fontSize: '14px'
+                  }}>
+                    <strong>Current Status:</strong> {recruitment.status}
+                    {recruitment.status === 'draft' && (
+                      <p style={{ margin: '8px 0 0 0', color: '#6b7280' }}>
+                        ℹ️ Click "Schedule" to make it visible and ready to open on start date
+                      </p>
+                    )}
+                    {recruitment.status === 'scheduled' && (
+                      <p style={{ margin: '8px 0 0 0', color: '#6b7280' }}>
+                        ℹ️ Will auto-open on {new Date(recruitment.startDate).toLocaleDateString()} or click "Open Now"
+                      </p>
+                    )}
+                    {recruitment.status === 'open' && (
+                      <p style={{ margin: '8px 0 0 0', color: '#059669' }}>
+                        ✅ Students can apply until {new Date(recruitment.endDate).toLocaleDateString()}
+                      </p>
+                    )}
+                  </div>
                 </div>
               </div>
             )}

@@ -203,7 +203,7 @@ text
 Status: draft → scheduled → open → closing_soon → closed → selection_done
 
 Steps:
-1. President creates recruitment:
+1. Core Members creates recruitment:
    - Title: "Club Name Recruitment 2024"
    - Description & eligibility
    - startDate & endDate (max 14 days)
