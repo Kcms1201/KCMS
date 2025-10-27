@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import analyticsService from '../../services/analyticsService';
 import clubService from '../../services/clubService';
+import reportService from '../../services/reportService';
 import Layout from '../../components/Layout';
 import './MemberAnalyticsPage.css';
 
@@ -40,16 +41,14 @@ const MemberAnalyticsPage = () => {
     }
   };
 
+  // Export members list as CSV (Workplan Gap Fix)
   const handleExport = async () => {
     try {
-      const response = await analyticsService.exportMemberReport(clubId, 'csv');
-      const url = window.URL.createObjectURL(new Blob([response.data]));
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `${club?.name}-member-analytics.csv`;
-      link.click();
+      const response = await reportService.exportMembersCSV(clubId);
+      reportService.downloadBlob(response.data, `${club?.name || 'club'}-members.csv`);
     } catch (err) {
-      alert('Failed to export report');
+      console.error('Export failed:', err);
+      alert('❌ Failed to export member list');
     }
   };
 

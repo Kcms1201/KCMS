@@ -75,6 +75,11 @@ RecruitmentSchema.pre('save', function(next) {
   next();
 });
 
+// Workplan Line 595: Database indexes for performance
+RecruitmentSchema.index({ status: 1 });
+RecruitmentSchema.index({ endDate: 1 });
+RecruitmentSchema.index({ club: 1, status: 1 });
+
 module.exports.Recruitment = mongoose.model(
   'Recruitment',
   RecruitmentSchema

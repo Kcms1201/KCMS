@@ -17,6 +17,12 @@ const authService = {
     return response.data;
   },
 
+  // Resend OTP (Workplan Gap Fix - Session progress saving)
+  resendOtp: async (email) => {
+    const response = await api.post('/auth/resend-otp', { email });
+    return response.data;
+  },
+
   // Complete Profile
   completeProfile: async (data) => {
     const tempToken = localStorage.getItem('tempToken');

@@ -410,7 +410,6 @@ class ReportService {
 
     const eventInfo = {
       title: event.title,
-      dateTime: event.dateTime,
       venue: event.venue,
       clubName: event.club.name
     };
@@ -420,6 +419,159 @@ class ReportService {
       attendanceData,
       eventInfo
     );
+  }
+
+  /**
+   * Generate CSV from data array
+   * Workplan Line 474: CSV export format
+   */
+  generateCSV(data, headers = null) {
+    if (!data || data.length === 0) {
+      throw new Error('No data to export to CSV');
+    }
+    
+    // If headers not provided, extract from first object
+    const csvHeaders = headers || Object.keys(data[0]);
+    
+    // Create CSV rows
+    const csvRows = [];
+    
+    // Add header row
+    csvRows.push(csvHeaders.join(','));
+    
+    // Add data rows
+    for (const row of data) {
+      const values = csvHeaders.map(header => {
+        const value = row[header];
+        
+        // Handle different data types
+        if (value === null || value === undefined) {
+          return '';
+        }
+        
+        // Handle dates
+        if (value instanceof Date) {
+          return value.toLocaleDateString();
+        }
+        
+        // Escape quotes and wrap in quotes if contains comma/quote/newline
+        const escaped = String(value).replace(/"/g, '""');
+        return escaped.includes(',') || escaped.includes('"') || escaped.includes('\n')
+          ? `"${escaped}"`
+          : escaped;
+      });
+      
+      csvRows.push(values.join(','));
+    }
+    
+    return csvRows.join('\n');
+  }
+
+  /**
+   * Export Club Activity Report as CSV
+   */
+  async exportClubActivityCSV({ clubId, year }) {
+    const club = await Club.findById(clubId).populate('coordinator', 'profile.name');
+    if (!club) {
+      const err = new Error('Club not found');
+      err.statusCode = 404;
+      throw err;
+    }
+
+    const startDate = new Date(year, 0, 1);
+    const endDate = new Date(year + 1, 0, 1);
+
+    const events = await Event.find({ 
+      club: clubId, 
+      dateTime: { $gte: startDate, $lt: endDate } 
+    }).lean();
+
+    const csvData = events.map(event => ({
+      'Event Title': event.title,
+      'Date': new Date(event.dateTime).toLocaleDateString(),
+      'Status': event.status,
+      'Venue': event.venue || 'N/A',
+      'Expected Attendees': event.expectedAttendees || 0,
+      'Budget': event.budget || 0
+    }));
+
+    return this.generateCSV(csvData);
+  }
+
+  /**
+   * Export Audit Logs as CSV
+   */
+  async exportAuditLogsCSV({ user, action, from, to, limit = 1000 }) {
+    const result = await this.listAudit({ user, action, from, to, page: 1, limit });
+    
+    const csvData = result.items.map(log => ({
+      'Timestamp': new Date(log.createdAt).toLocaleString(),
+      'User': log.user?.email || 'System',
+      'Action': log.action,
+      'Target': log.target,
+      'IP Address': log.ip,
+      'Status': log.status,
+      'Severity': log.severity
+    }));
+
+    return this.generateCSV(csvData);
+  }
+
+  /**
+   * Export Event Attendance as CSV
+   */
+  async exportAttendanceCSV(eventId) {
+    const event = await Event.findById(eventId).populate('club', 'name');
+    if (!event) {
+      const err = new Error('Event not found');
+      err.statusCode = 404;
+      throw err;
+    }
+
+    const attendance = await Attendance.find({ event: eventId })
+      .populate('user', 'profile.name rollNumber email')
+      .sort({ timestamp: -1 });
+
+    const csvData = attendance.map(att => ({
+      'Roll Number': att.user.rollNumber,
+      'Name': att.user.profile.name,
+      'Email': att.user.email,
+      'Status': att.status,
+      'Timestamp': new Date(att.timestamp).toLocaleString()
+    }));
+
+    return this.generateCSV(csvData);
+  }
+
+  /**
+   * Export Membership List as CSV
+   */
+  async exportMembersCSV(clubId) {
+    const club = await Club.findById(clubId);
+    if (!club) {
+      const err = new Error('Club not found');
+      err.statusCode = 404;
+      throw err;
+    }
+
+    const members = await Membership.find({ 
+      club: clubId, 
+      status: 'approved' 
+    })
+      .populate('user', 'profile.name rollNumber email profile.department profile.year')
+      .sort({ role: 1, createdAt: 1 });
+
+    const csvData = members.map(member => ({
+      'Roll Number': member.user.rollNumber,
+      'Name': member.user.profile.name,
+      'Email': member.user.email,
+      'Department': member.user.profile.department || 'N/A',
+      'Year': member.user.profile.year || 'N/A',
+      'Role': member.role,
+      'Joined At': new Date(member.createdAt).toLocaleDateString()
+    }));
+
+    return this.generateCSV(csvData);
   }
 }
 

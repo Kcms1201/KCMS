@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import eventService from '../../services/eventService';
+import reportService from '../../services/reportService';
 import Layout from '../../components/Layout';
 import './OrganizerAttendancePage.css';
 
@@ -63,6 +64,17 @@ const OrganizerAttendancePage = () => {
       await fetchData(); // Refresh
     } catch (err) {
       alert('Failed to mark attendance: ' + (err.response?.data?.message || err.message));
+    }
+  };
+
+  // Export attendance as CSV (Workplan Gap Fix)
+  const handleExportCSV = async () => {
+    try {
+      const response = await reportService.exportAttendanceCSV(eventId);
+      reportService.downloadBlob(response.data, `${event.title}-attendance.csv`);
+    } catch (err) {
+      console.error('Export failed:', err);
+      alert('❌ Failed to export attendance');
     }
   };
 
@@ -152,6 +164,9 @@ const OrganizerAttendancePage = () => {
               className="search-input"
             />
           </div>
+          <button onClick={handleExportCSV} className="btn btn-primary">
+            📥 Export CSV
+          </button>
         </div>
 
         {filteredOrganizers.length === 0 ? (

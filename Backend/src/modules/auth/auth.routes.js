@@ -16,6 +16,12 @@ router.post('/verify-otp',
   authCtrl.verifyOtp
 );
 
+// Resend OTP (Workplan Line 32: Session progress saving)
+router.post('/resend-otp',
+  validate(v.verifyOtp), // Reuse verifyOtp validator (only needs email)
+  authCtrl.resendOtp
+);
+
 // Complete profile (requires short‐JWT)
 router.post('/complete-profile',
   authMw,

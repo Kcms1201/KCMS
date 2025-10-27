@@ -31,9 +31,17 @@ exports.register = async ({ rollNumber, email, password }, userContext) => {
   await user.setPassword(password);
   await user.save();
 
+  // Workplan Line 22: Max 3 OTP resends per hour rate limiting
+  const key = `otp:reg:${email}`;
+  const resendCount = await redis.get(`${key}:count`);
+  if (resendCount && parseInt(resendCount) >= 3) {
+    const err = new Error('Maximum 3 OTP resends per hour exceeded. Please try again later.');
+    err.statusCode = 429;
+    throw err;
+  }
+
   // generate OTP
   const otp = Math.floor(100000 + Math.random() * 900000).toString();
-  const key = `otp:reg:${email}`;
   await redis.multi()
     .set(key, otp, 'EX', 600)
     .incr(`${key}:count`)
@@ -592,6 +600,60 @@ exports.resetPassword = async ({ identifier, otp, newPassword }, userContext) =>
   await auditService.log({
     user: user._id,
     action: 'PASSWORD_RESET',
+    target: `User:${user._id}`,
+    ip: userContext.ip,
+    userAgent: userContext.userAgent
+  });
+};
+
+/**
+ * RESEND OTP (Workplan Line 32: Session progress saving)
+ * Saves registration progress and resends OTP if session expires
+ */
+exports.resendOtp = async ({ email }, userContext) => {
+  // Check if user exists with pending OTP
+  const user = await User.findOne({ email, status: { $in: ['otp_sent', 'pending'] } });
+  if (!user) {
+    const err = new Error('No pending registration found for this email');
+    err.statusCode = 404;
+    throw err;
+  }
+
+  // Workplan Line 22: Max 3 OTP resends per hour rate limiting
+  const key = `otp:reg:${email}`;
+  const resendCount = await redis.get(`${key}:count`);
+  if (resendCount && parseInt(resendCount) >= 3) {
+    const err = new Error('Maximum 3 OTP resends per hour exceeded. Please try again later.');
+    err.statusCode = 429;
+    throw err;
+  }
+
+  // Save registration progress in Redis (Workplan Line 32)
+  await redis.setex(`registration:progress:${email}`, 3600, JSON.stringify({
+    rollNumber: user.rollNumber,
+    email: user.email,
+    status: user.status,
+    createdAt: user.createdAt
+  }));
+
+  // Generate and send new OTP
+  const otp = Math.floor(100000 + Math.random() * 900000).toString();
+  await redis.multi()
+    .set(key, otp, 'EX', 600)
+    .incr(`${key}:count`)
+    .expire(`${key}:count`, 3600)
+    .exec();
+
+  await sendMail({
+    to: email,
+    subject: 'KMIT Clubs Hub - Resend OTP',
+    html: `<p>Your new OTP is <strong>${otp}</strong>. Expires in 10 minutes.</p>`
+  });
+
+  // Audit log
+  await auditService.log({
+    user: user._id,
+    action: 'OTP_RESEND',
     target: `User:${user._id}`,
     ip: userContext.ip,
     userAgent: userContext.userAgent

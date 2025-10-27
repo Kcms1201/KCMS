@@ -34,4 +34,9 @@ const ClubSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+// Workplan Line 593: Database indexes for performance
+ClubSchema.index({ name: 1 });
+ClubSchema.index({ category: 1 });
+ClubSchema.index({ status: 1 });
+
 module.exports.Club = mongoose.model('Club', ClubSchema);

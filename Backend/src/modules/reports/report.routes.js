@@ -85,4 +85,43 @@ router.post(
   ctrl.generateAttendanceReport
 );
 
+// ===============================
+// CSV EXPORT ROUTES (Workplan Line 474)
+// ===============================
+
+// Export Club Activity as CSV
+router.get(
+  '/export/csv/clubs/:clubId/activity/:year',
+  authenticate,
+  requireCoordinatorOrAdmin(),
+  validate(v.clubIdAndYear, 'params'),
+  ctrl.exportClubActivityCSV
+);
+
+// Export Audit Logs as CSV
+router.get(
+  '/export/csv/audit-logs',
+  authenticate,
+  requireAdmin(),
+  validate(v.listAuditSchema, 'query'),
+  ctrl.exportAuditLogsCSV
+);
+
+// Export Event Attendance as CSV
+router.get(
+  '/export/csv/attendance/:eventId',
+  authenticate,
+  requireCoordinatorOrAdmin(),
+  validate(v.eventId, 'params'),
+  ctrl.exportAttendanceCSV
+);
+
+// Export Club Members as CSV
+router.get(
+  '/export/csv/clubs/:clubId/members',
+  authenticate,
+  requireCoordinatorOrAdmin(),
+  ctrl.exportMembersCSV
+);
+
 module.exports = router;

@@ -29,9 +29,9 @@ const auditService = {
     return response.data;
   },
 
-  // Export audit logs to CSV
+  // Export audit logs to CSV (Workplan Gap Fix - uses reports CSV endpoint)
   exportCSV: async (params = {}) => {
-    const response = await api.get('/audit/export', {
+    const response = await api.get('/reports/export/csv/audit-logs', {
       params,
       responseType: 'blob' // Important for file download
     });

@@ -145,3 +145,19 @@ exports.getJwtInfo = async (req, res, next) => {
     next(err);
   }
 };
+
+/**
+ * Resend OTP (Workplan Line 32: Session progress saving)
+ */
+exports.resendOtp = async (req, res, next) => {
+  try {
+    await authSvc.resendOtp(req.body, {
+      id: null,
+      ip: req.ip,
+      userAgent: req.headers['user-agent']
+    });
+    successResponse(res, null, 'OTP resent to email');
+  } catch (err) {
+    next(err);
+  }
+};

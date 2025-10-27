@@ -114,4 +114,9 @@ EventSchema.pre('save', function(next) {
   next();
 });
 
+// Workplan Line 594: Database indexes for performance
+EventSchema.index({ dateTime: 1 });
+EventSchema.index({ club: 1, dateTime: 1 });
+EventSchema.index({ status: 1 });
+
 module.exports.Event = mongoose.model('Event', EventSchema);

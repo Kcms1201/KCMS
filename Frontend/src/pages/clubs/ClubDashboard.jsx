@@ -7,6 +7,7 @@ import eventService from '../../services/eventService';
 import userService from '../../services/userService';
 import recruitmentService from '../../services/recruitmentService';
 import analyticsService from '../../services/analyticsService';
+import reportService from '../../services/reportService';
 import { getClubLogoUrl, getClubLogoPlaceholder } from '../../utils/imageUtils';
 import { ROLE_DISPLAY_NAMES, LEADERSHIP_ROLES, CORE_ROLES } from '../../utils/roleConstants';
 import '../../styles/ClubDashboard.css';
@@ -281,6 +282,18 @@ const ClubDashboard = () => {
     }
   };
 
+  // Export club activity as CSV (Workplan Gap Fix)
+  const handleExportActivity = async () => {
+    try {
+      const currentYear = new Date().getFullYear();
+      const response = await reportService.exportClubActivityCSV(clubId, currentYear);
+      reportService.downloadBlob(response.data, `${club.name}-activity-${currentYear}.csv`);
+    } catch (error) {
+      console.error('Error exporting activity:', error);
+      alert('❌ Failed to export activity report');
+    }
+  };
+
   if (loading) {
     return (
       <Layout>
@@ -358,6 +371,10 @@ const ClubDashboard = () => {
             <Link to={`/clubs/${clubId}`} className="btn btn-outline">
               👁️ View Public Page
             </Link>
+            {/* 📊 Export Activity CSV (Workplan Gap Fix) */}
+            <button onClick={handleExportActivity} className="btn btn-outline">
+              📥 Export Activity (CSV)
+            </button>
             {/* ✅ Coordinator Approval Buttons for Archive Request */}
             {user?.roles?.global === 'coordinator' && club.status === 'pending_archive' && (
               <>

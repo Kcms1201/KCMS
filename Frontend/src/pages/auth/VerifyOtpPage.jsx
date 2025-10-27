@@ -77,14 +77,20 @@ const VerifyOtpPage = () => {
 
   const handleResend = async () => {
     setResendLoading(true);
+    setError('');
     try {
-      // Call register again to resend OTP
-      await authService.register({ email, resend: true });
-      setTimer(600);
-      setError('');
-      alert('OTP resent successfully!');
+      // Use the new resendOtp endpoint (Workplan Gap Fix)
+      await authService.resendOtp(email);
+      setTimer(600); // Reset timer to 10 minutes
+      setOtp(['', '', '', '', '', '']); // Clear OTP inputs
+      alert('✅ OTP resent successfully! Please check your email.');
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to resend OTP');
+      const errorMsg = err.response?.data?.message || 'Failed to resend OTP';
+      setError(errorMsg);
+      // If rate limit error, show helpful message
+      if (err.response?.status === 429) {
+        setError('⏳ Too many attempts. Please wait an hour before requesting another OTP.');
+      }
     } finally {
       setResendLoading(false);
     }

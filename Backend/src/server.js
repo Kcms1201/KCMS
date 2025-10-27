@@ -83,6 +83,16 @@ async function start() {
     }
   }
 
+  // Start recruitment reminder cron (Workplan Line 222: Daily reminder if <100 applications)
+  if (config.START_SCHEDULERS) {
+    try {
+      require('./jobs/recruitmentReminder');
+      console.log('📋 Recruitment Reminder Cron: Running daily at 6 PM IST');
+    } catch (e) {
+      console.error('Failed to start recruitment reminder:', e);
+    }
+  }
+
   // Verify SMTP (optional hard fail)
   if (config.SMTP_HOST) {
     try {

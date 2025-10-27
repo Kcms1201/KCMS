@@ -51,6 +51,10 @@ const UserSchema = new mongoose.Schema({
   }
 }, { timestamps: true });
 
+// Workplan Line 592: Database indexes for performance
+UserSchema.index({ rollNumber: 1 });
+UserSchema.index({ email: 1 });
+
 // Override setPassword to push to history
 UserSchema.methods.setPassword = async function (plain) {
   // Check not reusing last 3

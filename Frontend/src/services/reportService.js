@@ -91,6 +91,46 @@ const reportService = {
     document.body.removeChild(link);
     window.URL.revokeObjectURL(url);
   },
+
+  // ==========================================
+  // CSV EXPORT METHODS (Workplan Gap Fix)
+  // ==========================================
+
+  // Export club activity as CSV
+  exportClubActivityCSV: async (clubId, year) => {
+    const response = await api.get(
+      `/reports/export/csv/clubs/${clubId}/activity/${year}`,
+      { responseType: 'blob' }
+    );
+    return response;
+  },
+
+  // Export audit logs as CSV
+  exportAuditLogsCSV: async (params = {}) => {
+    const response = await api.get('/reports/export/csv/audit-logs', {
+      params,
+      responseType: 'blob'
+    });
+    return response;
+  },
+
+  // Export event attendance as CSV
+  exportAttendanceCSV: async (eventId) => {
+    const response = await api.get(
+      `/reports/export/csv/attendance/${eventId}`,
+      { responseType: 'blob' }
+    );
+    return response;
+  },
+
+  // Export club members as CSV
+  exportMembersCSV: async (clubId) => {
+    const response = await api.get(
+      `/reports/export/csv/clubs/${clubId}/members`,
+      { responseType: 'blob' }
+    );
+    return response;
+  },
 };
 
 export default reportService;

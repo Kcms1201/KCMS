@@ -103,3 +103,62 @@ exports.generateAttendanceReport = async (req, res, next) => {
     successResponse(res, { report }, 'Attendance report generated');
   } catch (err) { next(err); }
 };
+
+// ===============================
+// CSV EXPORT ENDPOINTS (Workplan Line 474)
+// ===============================
+
+/**
+ * Export Club Activity Report as CSV
+ */
+exports.exportClubActivityCSV = async (req, res, next) => {
+  try {
+    const csv = await svc.exportClubActivityCSV({
+      clubId: req.params.clubId,
+      year: parseInt(req.params.year)
+    });
+    
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="club-activity-${req.params.year}.csv"`);
+    res.send(csv);
+  } catch (err) { next(err); }
+};
+
+/**
+ * Export Audit Logs as CSV
+ */
+exports.exportAuditLogsCSV = async (req, res, next) => {
+  try {
+    const csv = await svc.exportAuditLogsCSV(req.query);
+    
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', 'attachment; filename="audit-logs.csv"');
+    res.send(csv);
+  } catch (err) { next(err); }
+};
+
+/**
+ * Export Event Attendance as CSV
+ */
+exports.exportAttendanceCSV = async (req, res, next) => {
+  try {
+    const csv = await svc.exportAttendanceCSV(req.params.eventId);
+    
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="attendance-${req.params.eventId}.csv"`);
+    res.send(csv);
+  } catch (err) { next(err); }
+};
+
+/**
+ * Export Club Members as CSV
+ */
+exports.exportMembersCSV = async (req, res, next) => {
+  try {
+    const csv = await svc.exportMembersCSV(req.params.clubId);
+    
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="members-${req.params.clubId}.csv"`);
+    res.send(csv);
+  } catch (err) { next(err); }
+};
