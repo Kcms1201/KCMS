@@ -301,6 +301,17 @@ function GalleryPage() {
 
   const handleFileSelect = (e) => {
     const files = Array.from(e.target.files);
+    
+    // Check for files larger than 25MB
+    const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25MB in bytes
+    const oversizedFiles = files.filter(file => file.size > MAX_FILE_SIZE);
+    
+    if (oversizedFiles.length > 0) {
+      alert(`Some files exceed the 25MB limit. Please select smaller files.`);
+      e.target.value = ''; // Clear the file input
+      return;
+    }
+    
     setUploadFiles(files);
   };
 
@@ -802,7 +813,7 @@ function GalleryPage() {
                 </div>
 
                 <div className="form-group">
-                  <label>Select Files * (Max 10 images, 5MB each)</label>
+                  <label>Select Files * (Max 10 images, 25MB each)</label>
                   <input
                     type="file"
                     accept="image/jpeg,image/png,image/webp"

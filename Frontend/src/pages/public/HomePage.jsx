@@ -109,7 +109,7 @@ const HomePage = () => {
       shortName: 'AAKARSHAN',
       description: 'Aakarshan Art Club is the creative hub of KMIT, bringing together artists and art enthusiasts. We explore diverse art forms including painting, sketching, digital art, and sculpture. Through exhibitions, workshops, and collaborative projects, we nurture artistic talent and celebrate visual creativity.',
       tagline: 'Where imagination meets canvas',
-      backgroundImage: '/src/utils/logos/Aakarshan-logo.jpg',
+      backgroundImage: '/src/utils/bg_images/aakarshan.jpg',
       cardImage: '/src/utils/logos/Aakarshan-logo.jpg',
       category: 'Creative'
     },

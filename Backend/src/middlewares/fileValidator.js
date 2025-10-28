@@ -10,7 +10,7 @@ const allowedTypes = {
   image: {
     mimes: ['image/jpeg', 'image/png', 'image/webp'],
     extensions: ['jpg', 'jpeg', 'png', 'webp'],
-    maxSize: 5 * 1024 * 1024 // 5MB
+    maxSize: 25 * 1024 * 1024 // 25MB
   },
   document: {
     mimes: ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'],

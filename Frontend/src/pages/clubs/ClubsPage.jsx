@@ -54,8 +54,14 @@ const ClubsPage = () => {
       <div className="clubs-page">
         <div className="page-header">
           <div>
-            <h1>Explore Clubs</h1>
-            <p>Discover and join clubs that match your interests</p>
+            {user?.roles?.global === 'coordinator' ? (
+              <h1>My Clubs</h1>
+            ) : (
+              <>
+                <h1>Explore Clubs</h1>
+                <p>Discover and join clubs that match your interests</p>
+              </>
+            )}
           </div>
           {user?.roles?.global === 'admin' && (
             <Link to="/clubs/create" className="btn btn-primary">
