@@ -89,8 +89,8 @@ const ClubDashboard = () => {
       
       // Backend: successResponse(res, { total, events }) → { status, data: { total, events } }
       const eventsData = eventsRes.data?.events || [];
-      // Backend: successResponse(res, { total, items }) → { status, data: { total, items } }
-      const recruitmentsData = recruitmentsRes.data?.items || [];
+      // Backend: successResponse(res, { recruitments, total }) → { status, data: { recruitments, total } }
+      const recruitmentsData = recruitmentsRes.data?.recruitments || [];
       
       setEvents(eventsData);
       setRecruitments(recruitmentsData);

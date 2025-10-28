@@ -19,7 +19,6 @@ import CreateClubPage from './pages/clubs/CreateClubPage';
 import EditClubPage from './pages/clubs/EditClubPage';
 import MemberAnalyticsPage from './pages/clubs/MemberAnalyticsPage';
 import MemberActivityDetailPage from './pages/clubs/MemberActivityDetailPage';
-import ClubMeetingsPage from './pages/clubs/ClubMeetingsPage';
 
 // Event Pages (OLD STRUCTURE)
 import EventsPage from './pages/events/EventsPage';
@@ -171,14 +170,6 @@ function App() {
             element={
               <ProtectedRoute>
                 <EditClubPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/clubs/:clubId/meetings"
-            element={
-              <ProtectedRoute>
-                <ClubMeetingsPage />
               </ProtectedRoute>
             }
           />

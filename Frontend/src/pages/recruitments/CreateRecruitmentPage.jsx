@@ -173,9 +173,10 @@ const CreateRecruitmentPage = () => {
         dataToSend.eligibility = formData.eligibility;
       }
 
-      // ✅ Backend expects positions as array of strings, but form has it as number
-      // Since positions is optional and we're not using it properly, we'll skip it
-      // Future: Convert to array of position names like ['President', 'Secretary']
+      // ✅ Include positions if provided (now accepts number)
+      if (formData.positions && formData.positions > 0) {
+        dataToSend.positions = parseInt(formData.positions, 10);
+      }
 
       const response = await recruitmentService.create(dataToSend);
       

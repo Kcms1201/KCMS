@@ -72,10 +72,16 @@ const ApplicationsPage = () => {
   };
 
   const toggleSelectAll = () => {
-    if (selectedApps.length === applications.length) {
+    // Only allow selecting pending applications (not finalized)
+    const pendingApps = applications.filter(
+      app => app.status === 'submitted' || app.status === 'under_review'
+    );
+    const pendingAppIds = pendingApps.map(app => app._id);
+    
+    if (selectedApps.length === pendingAppIds.length) {
       setSelectedApps([]);
     } else {
-      setSelectedApps(applications.map(app => app._id));
+      setSelectedApps(pendingAppIds);
     }
   };
 
@@ -83,7 +89,7 @@ const ApplicationsPage = () => {
     switch (status) {
       case 'selected': return 'badge-success';
       case 'rejected': return 'badge-error';
-      case 'waitlisted': return 'badge-warning';
+      case 'under_review': return 'badge-warning';
       default: return 'badge-info';
     }
   };
@@ -167,9 +173,6 @@ const ApplicationsPage = () => {
               <button onClick={() => handleBulkReview('selected')} className="btn btn-success btn-sm">
                 Select All
               </button>
-              <button onClick={() => handleBulkReview('waitlisted')} className="btn btn-warning btn-sm">
-                Waitlist All
-              </button>
               <button onClick={() => handleBulkReview('rejected')} className="btn btn-danger btn-sm">
                 Reject All
               </button>
@@ -183,8 +186,12 @@ const ApplicationsPage = () => {
             <div className="applications-header">
               <input
                 type="checkbox"
-                checked={selectedApps.length === applications.length}
+                checked={
+                  applications.filter(app => app.status === 'submitted' || app.status === 'under_review').length > 0 &&
+                  selectedApps.length === applications.filter(app => app.status === 'submitted' || app.status === 'under_review').length
+                }
                 onChange={toggleSelectAll}
+                disabled={applications.filter(app => app.status === 'submitted' || app.status === 'under_review').length === 0}
               />
               <span>Select All</span>
             </div>
@@ -196,6 +203,11 @@ const ApplicationsPage = () => {
                     type="checkbox"
                     checked={selectedApps.includes(app._id)}
                     onChange={() => toggleSelection(app._id)}
+                    disabled={app.status === 'selected' || app.status === 'rejected'}
+                    style={{ 
+                      cursor: (app.status === 'selected' || app.status === 'rejected') ? 'not-allowed' : 'pointer',
+                      opacity: (app.status === 'selected' || app.status === 'rejected') ? 0.3 : 1
+                    }}
                   />
                 </div>
 
@@ -225,19 +237,13 @@ const ApplicationsPage = () => {
                     )}
                   </div>
 
-                  {app.status === 'submitted' && (
+                  {(app.status === 'submitted' || app.status === 'under_review') && (
                     <div className="application-actions">
                       <button
                         onClick={() => handleReview(app._id, 'selected')}
                         className="btn btn-success btn-sm"
                       >
                         Select
-                      </button>
-                      <button
-                        onClick={() => handleReview(app._id, 'waitlisted')}
-                        className="btn btn-warning btn-sm"
-                      >
-                        Waitlist
                       </button>
                       <button
                         onClick={() => handleReview(app._id, 'rejected')}

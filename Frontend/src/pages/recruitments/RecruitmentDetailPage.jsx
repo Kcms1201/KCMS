@@ -209,12 +209,20 @@ const RecruitmentDetailPage = () => {
                 <span className="detail-label">End Date:</span>
                 <span>{new Date(recruitment.endDate).toLocaleDateString()}</span>
               </div>
-              {recruitment.positions && (
-                <div className="detail-row">
-                  <span className="detail-label">Positions Available:</span>
-                  <span>{recruitment.positions}</span>
-                </div>
-              )}
+              <div className="detail-row">
+                <span className="detail-label">Positions Available:</span>
+                <span>
+                  {(() => {
+                    if (typeof recruitment.positions === 'number') {
+                      return recruitment.positions;
+                    } else if (Array.isArray(recruitment.positions) && recruitment.positions.length > 0) {
+                      return recruitment.positions.length;
+                    } else {
+                      return 'Not specified';
+                    }
+                  })()}
+                </span>
+              </div>
               {recruitment.eligibility && (
                 <div className="detail-row">
                   <span className="detail-label">Eligibility:</span>
@@ -336,9 +344,9 @@ const RecruitmentDetailPage = () => {
                     marginLeft: '8px',
                     padding: '4px 12px',
                     background: userApplication?.status === 'selected' ? '#dcfce7' : 
-                               userApplication?.status === 'rejected' ? '#fee2e2' : '#fef3c7',
+                               userApplication?.status === 'rejected' ? '#fee2e2' : '#e0f2fe',
                     color: userApplication?.status === 'selected' ? '#16a34a' : 
-                           userApplication?.status === 'rejected' ? '#dc2626' : '#ca8a04',
+                           userApplication?.status === 'rejected' ? '#dc2626' : '#0369a1',
                     borderRadius: '12px',
                     fontSize: '13px',
                     fontWeight: '500'
@@ -358,11 +366,6 @@ const RecruitmentDetailPage = () => {
               {userApplication?.status === 'rejected' && (
                 <p style={{ marginTop: '12px', color: '#dc2626' }}>
                   Unfortunately, your application was not successful this time. Keep trying!
-                </p>
-              )}
-              {userApplication?.status === 'waitlisted' && (
-                <p style={{ marginTop: '12px', color: '#ca8a04' }}>
-                  You are on the waitlist. We'll notify you if a spot becomes available.
                 </p>
               )}
             </div>

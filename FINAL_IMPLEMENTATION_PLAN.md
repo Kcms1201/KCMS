@@ -311,25 +311,25 @@ const eventCompletionWorker = require('./workers/event-completion.worker');
 
 ---
 
-**2. Complete Meeting System Integration** ⚡ **30 minutes**
-```javascript
-// Frontend/src/services/meetingService.js - ADD:
-getMeeting: (meetingId) => api.get(`/clubs/meetings/${meetingId}`),
-markAttendance: (meetingId, data) => api.post(`/clubs/meetings/${meetingId}/attendance`, data),
-completeMeeting: (meetingId) => api.patch(`/clubs/meetings/${meetingId}/complete`)
-```
-**Impact:** Meetings system becomes fully functional
-**Note:** Backend already complete, just frontend service methods missing
+**2. ❌ REMOVED: Meeting System** 
+**User Decision:** Meeting system removed - not needed
+**Action:** Delete meeting-related files:
+- Backend/src/modules/club/meeting.model.js
+- Backend/src/modules/club/meeting.controller.js
+- Meeting routes from club.routes.js
+**Status:** TO BE DELETED
 
 ---
 
-**3. Meeting Analytics Integration** ⚡ **2 hours**
+**3. Simple Document Upload in Club Dashboard** ⚡ **1 hour**
 ```javascript
-// Backend/src/modules/analytics/analytics.service.js
-// Update getClubMemberAnalytics() to include Meeting model
-// Calculate engagement score: (events + meetings) / total
+// Simple upload for PDFs (meeting notes, certificates, etc.)
+// POST /api/clubs/:clubId/documents
+// GET /api/clubs/:clubId/documents
+// DELETE /api/clubs/:clubId/documents/:docId
 ```
-**Impact:** Workplan requires tracking member engagement across events + meetings
+**Impact:** Clubs can upload and manage documents
+**Status:** TO BE IMPLEMENTED
 
 ---
 
@@ -344,12 +344,12 @@ completeMeeting: (meetingId) => api.patch(`/clubs/meetings/${meetingId}/complete
 
 ---
 
-**5. Event Completion Checklist UI** ⚡ **2 hours**
-- Display checklist in EventDetailPage
-- Show deadline countdown
-- Add "Upload Materials" button
-- Visual feedback for 5+ photos requirement
-**Workplan:** Section 5.2 - Post-event requirements
+**5. Simple Event Upload UI** ⚡ **1 hour**
+- SIMPLIFIED: Basic upload inputs (no complex checklist)
+- 4 simple file inputs: photos, report, attendance, bills
+- Simple checkmarks when uploaded
+- "Mark Complete" button
+**Workplan:** Section 5.2 - Post-event requirements (simplified)
 
 ---
 

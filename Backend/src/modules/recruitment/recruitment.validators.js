@@ -33,8 +33,10 @@ module.exports = {
       'date.base': 'Invalid end date format',
       'date.greater': 'End date must be after start date'
     }),
-    positions: Joi.array().items(Joi.string()).optional().messages({
-      'array.base': 'Positions must be an array of strings'
+    positions: Joi.number().integer().min(1).max(100).optional().messages({
+      'number.base': 'Positions must be a number',
+      'number.min': 'At least 1 position required',
+      'number.max': 'Maximum 100 positions allowed'
     }),
     customQuestions: Joi.array().items(Joi.string()).max(5).optional().messages({
       'array.max': 'Maximum 5 custom questions allowed'
@@ -57,8 +59,10 @@ module.exports = {
     endDate: Joi.date().messages({
       'date.base': 'Invalid end date format'
     }),
-    positions: Joi.array().items(Joi.string()).messages({
-      'array.base': 'Positions must be an array of strings'
+    positions: Joi.number().integer().min(1).max(100).messages({
+      'number.base': 'Positions must be a number',
+      'number.min': 'At least 1 position required',
+      'number.max': 'Maximum 100 positions allowed'
     }),
     customQuestions: Joi.array().items(Joi.string()).max(5).messages({
       'array.max': 'Maximum 5 custom questions allowed'
@@ -97,12 +101,12 @@ module.exports = {
   }),
 
   reviewSchema: Joi.object({
-    status: Joi.string().valid('selected','rejected','waitlisted').required(),
+    status: Joi.string().valid('selected','rejected').required(),
     score: Joi.number().min(0).optional()
   }),
 
   bulkReviewSchema: Joi.object({
     applicationIds: Joi.array().items(objectId).min(1).required(),
-    status: Joi.string().valid('selected','rejected','waitlisted').required()
+    status: Joi.string().valid('selected','rejected').required()
   })
 };

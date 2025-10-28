@@ -31,8 +31,9 @@ const RecruitmentSchema = new mongoose.Schema(
       required: true
     },
     positions: {
-      type: [String],
-      default: []
+      type: Number,
+      min: 1,
+      max: 100
     },
     customQuestions: {
       type: [String],

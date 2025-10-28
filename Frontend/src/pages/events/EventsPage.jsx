@@ -6,10 +6,15 @@ import eventService from '../../services/eventService';
 import '../../styles/Events.css';
 
 const EventsPage = () => {
-  const { user } = useAuth();
+  const { user, clubMemberships } = useAuth();
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('upcoming');
+  
+  // Check if user has any core/leadership role in any club
+  const isClubManager = clubMemberships?.some(m => 
+    ['president', 'vicePresident', 'core', 'secretary', 'treasurer', 'leadPR', 'leadTech'].includes(m.role)
+  );
 
   useEffect(() => {
     fetchEvents();
@@ -102,8 +107,8 @@ const EventsPage = () => {
                Completed
             </button>
             
-            {/* Role-based filters */}
-            {user && (
+            {/* Role-based filters - For club managers, coordinators and admins */}
+            {(isClubManager || user?.roles?.global === 'coordinator' || user?.roles?.global === 'admin') && (
               <button
                 className={`filter-btn ${filter === 'draft' ? 'active' : ''}`}
                 onClick={() => setFilter('draft')}
@@ -130,8 +135,8 @@ const EventsPage = () => {
               </button>
             )}
             
-            {/* Event Creator filters - Show for any logged-in user */}
-            {user && (
+            {/* Post-event filters - For club managers, coordinators and admins */}
+            {(isClubManager || user?.roles?.global === 'coordinator' || user?.roles?.global === 'admin') && (
               <>
                 <button
                   className={`filter-btn ${filter === 'pending_completion' ? 'active' : ''}`}

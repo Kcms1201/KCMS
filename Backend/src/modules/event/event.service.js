@@ -213,6 +213,15 @@ class EventService {
     data.photos = data.photos || [];
     data.photoCount = photoCount; // Add actual count for display
     
+    // ✅ Add registration counts for event management
+    const { EventRegistration } = require('./eventRegistration.model');
+    const [registrationCount, pendingRegistrations] = await Promise.all([
+      EventRegistration.countDocuments({ event: id }),
+      EventRegistration.countDocuments({ event: id, status: 'pending' })
+    ]);
+    data.registrationCount = registrationCount;
+    data.pendingRegistrations = pendingRegistrations;
+    
     return data;
   }
 

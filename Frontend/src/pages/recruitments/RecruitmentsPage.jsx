@@ -128,10 +128,10 @@ const RecruitmentsPage = () => {
                         </span>
                       </div>
                     )}
-                    {recruitment.positions && recruitment.positions.length > 0 && (
+                    {recruitment.positions && recruitment.positions > 0 && (
                       <div className="meta-item">
                         <span className="meta-icon">👥</span>
-                        <span>{recruitment.positions.length} position{recruitment.positions.length !== 1 ? 's' : ''}</span>
+                        <span>{recruitment.positions} position{recruitment.positions !== 1 ? 's' : ''}</span>
                       </div>
                     )}
                   </div>

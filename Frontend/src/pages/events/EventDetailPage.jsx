@@ -397,6 +397,58 @@ const EventDetailPage = () => {
           />
         )}
 
+        {/* ✅ Event Registrations Management */}
+        {canManage && event?.status !== 'draft' && (
+          <div className="info-card" style={{ marginBottom: '2rem' }}>
+            <div className="section-header">
+              <h3>📝 Event Registrations</h3>
+              <p className="section-subtitle">Manage audience and performer registrations</p>
+            </div>
+            
+            <div className="registration-stats" style={{ 
+              display: 'grid', 
+              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+              gap: '1rem', 
+              margin: '1.5rem 0' 
+            }}>
+              <div className="stat-item" style={{ 
+                padding: '1rem', 
+                background: '#f8fafc', 
+                borderRadius: '8px',
+                border: '1px solid #e2e8f0'
+              }}>
+                <div style={{ fontSize: '0.875rem', color: '#64748b', marginBottom: '0.5rem' }}>
+                  Total Registrations
+                </div>
+                <div style={{ fontSize: '1.875rem', fontWeight: '600', color: '#1e293b' }}>
+                  {event.registrationCount || 0}
+                </div>
+              </div>
+              <div className="stat-item" style={{ 
+                padding: '1rem', 
+                background: '#fef3c7', 
+                borderRadius: '8px',
+                border: '1px solid #fbbf24'
+              }}>
+                <div style={{ fontSize: '0.875rem', color: '#92400e', marginBottom: '0.5rem' }}>
+                  Pending Approval
+                </div>
+                <div style={{ fontSize: '1.875rem', fontWeight: '600', color: '#92400e' }}>
+                  {event.pendingRegistrations || 0}
+                </div>
+              </div>
+            </div>
+            
+            <button 
+              onClick={() => navigate(`/clubs/${event.club._id}/registrations`)}
+              className="btn btn-primary"
+              style={{ width: '100%' }}
+            >
+              📋 View & Manage Registrations
+            </button>
+          </div>
+        )}
+
         {/* ✅ Club Member Attendance Section - For Ongoing and Published Events */}
         {canManage && (event?.status === 'ongoing' || event?.status === 'published') && (
           <div className="attendance-section">
