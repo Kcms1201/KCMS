@@ -68,9 +68,11 @@ exports.register = async ({ rollNumber, email, password }, userContext) => {
   // notification (in-app or email)
   await notificationService.create({
     user: user._id,
-    type: 'system_maintenance', // or define 'otp_sent'
+    type: 'system_maintenance',
+    title: '📧 OTP Sent',
+    message: `A one-time password has been sent to ${email}. Please check your email.`,
     payload: { email },
-    priority: 'HIGH'
+    priority: 'MEDIUM'
   });
 };
 
@@ -191,6 +193,8 @@ exports.completeProfile = async (userId, profileData, userContext) => {
   await notificationService.create({
     user: user._id,
     type: 'role_assigned',
+    title: '🎓 Welcome to KCMS!',
+    message: 'Your account has been created successfully. You have been assigned the Student role.',
     payload: { role: 'student' },
     priority: 'MEDIUM'
   });
@@ -251,8 +255,10 @@ exports.login = async ({ identifier, password, rememberDevice }, userContext) =>
       await notificationService.create({
         user: user._id,
         type: 'system_maintenance',
+        title: '🔒 Account Locked',
+        message: 'Your account has been locked due to too many failed login attempts. It will be unlocked in 30 minutes.',
         payload: {},
-        priority: 'HIGH'
+        priority: 'URGENT'
       });
     }
     await user.save();
@@ -295,6 +301,8 @@ exports.login = async ({ identifier, password, rememberDevice }, userContext) =>
     await notificationService.create({
       user: user._id,
       type: 'system_maintenance',
+      title: '🔐 New Device Login',
+      message: `Login detected from a new device: ${deviceInfo.browser} on ${deviceInfo.os}. If this wasn't you, please change your password immediately.`,
       payload: { 
         reason: 'new_device_login',
         deviceName: deviceInfo.deviceName,
@@ -479,7 +487,9 @@ exports.forgotPassword = async (identifier, userContext) => {
   // Enqueue notification
   await notificationService.create({
     user: user._id,
-    type: 'system_maintenance',  // or define a specific 'password_reset' type
+    type: 'system_maintenance',
+    title: '🔑 Password Reset Requested',
+    message: 'A password reset OTP has been sent to your email. Use it to reset your password.',
     payload: { email },
     priority: 'HIGH'
   });
@@ -591,7 +601,9 @@ exports.resetPassword = async ({ identifier, otp, newPassword }, userContext) =>
   // notification
   await notificationService.create({
     user: user._id,
-    type: 'system_maintenance',  // or 'password_reset_success'
+    type: 'system_maintenance',
+    title: '✅ Password Reset Successful',
+    message: 'Your password has been reset successfully. You can now login with your new password.',
     payload: {},
     priority: 'MEDIUM'
   });

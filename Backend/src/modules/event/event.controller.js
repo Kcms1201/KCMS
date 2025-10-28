@@ -233,7 +233,7 @@ exports.updateOrganizerAttendance = async (req, res, next) => {
   try {
     await svc.updateOrganizerAttendance(
       req.params.id,
-      req.body.attendance,
+      req.body,
       { id: req.user.id, ip: req.ip, userAgent: req.headers['user-agent'] }
     );
     successResponse(res, null, 'Organizer attendance updated');

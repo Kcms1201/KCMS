@@ -1,9 +1,48 @@
 const router = require('express').Router();
 const authenticate = require('../../middlewares/auth');
-const { permit, requireAdmin, requireCoordinatorOrAdmin } = require('../../middlewares/permission');
+const { permit, requireAdmin, requireCoordinatorOrAdmin, requireEither, CORE_AND_PRESIDENT } = require('../../middlewares/permission');
+const { hasClubMembership } = require('../../utils/rbac');
+const { errorResponse } = require('../../utils/response');
 const validate     = require('../../middlewares/validate');
 const v            = require('./report.validators');
 const ctrl         = require('./report.controller');
+
+// Custom middleware: Allow coordinators (all events) OR club leaders (their events)
+const requireCoordinatorOrClubLeader = () => {
+  return async (req, res, next) => {
+    if (!req.user) {
+      return errorResponse(res, 401, 'Authentication required');
+    }
+
+    const userRole = req.user.roles?.global;
+    
+    // Admin or Coordinator - access all events
+    if (userRole === 'admin' || userRole === 'coordinator') {
+      return next();
+    }
+
+    // Club leaders - check if they're a leader of the event's club
+    try {
+      const { Event } = require('../event/event.model');
+      const eventId = req.params.eventId;
+      
+      const event = await Event.findById(eventId).lean();
+      if (!event) {
+        return errorResponse(res, 404, 'Event not found');
+      }
+
+      const hasRole = await hasClubMembership(req.user.id, event.club.toString(), CORE_AND_PRESIDENT);
+      if (hasRole) {
+        return next();
+      }
+
+      return errorResponse(res, 403, 'Access denied: Coordinators or club leaders only');
+    } catch (error) {
+      console.error('Permission check error:', error);
+      return errorResponse(res, 500, 'Error checking permissions');
+    }
+  };
+};
 
 // Dashboard (Coordinator or Admin - Section 8.1)
 router.get(
@@ -111,7 +150,7 @@ router.get(
 router.get(
   '/export/csv/attendance/:eventId',
   authenticate,
-  requireCoordinatorOrAdmin(),
+  requireCoordinatorOrClubLeader(), // ✅ Coordinators (all events) OR club leaders (their events)
   validate(v.eventId, 'params'),
   ctrl.exportAttendanceCSV
 );

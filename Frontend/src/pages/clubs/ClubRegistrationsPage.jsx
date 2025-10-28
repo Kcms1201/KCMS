@@ -16,7 +16,6 @@ const ClubRegistrationsPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   
-  const [auditionModal, setAuditionModal] = useState({ show: false, registration: null });
   const [rejectModal, setRejectModal] = useState({ show: false, registration: null });
 
   useEffect(() => {
@@ -107,24 +106,6 @@ const ClubRegistrationsPage = () => {
     }
   };
 
-  const handleAudition = (registration) => {
-    setAuditionModal({ show: true, registration });
-  };
-
-  const updateAudition = async (status, notes) => {
-    try {
-      await registrationService.updateAuditionStatus(auditionModal.registration._id, {
-        auditionStatus: status,
-        auditionDate: new Date(),
-        auditionNotes: notes
-      });
-      alert(`🎪 Audition status updated to: ${status}`);
-      setAuditionModal({ show: false, registration: null });
-      fetchRegistrations();
-    } catch (err) {
-      alert('Failed to update audition: ' + (err.response?.data?.message || err.message));
-    }
-  };
 
   const getStatusBadge = (status) => {
     const badges = {
@@ -136,15 +117,6 @@ const ClubRegistrationsPage = () => {
     return badges[status] || status;
   };
 
-  const getAuditionBadge = (status) => {
-    const badges = {
-      not_required: '➖ Not Required',
-      pending_audition: '⏳ Pending Audition',
-      audition_passed: '✅ Passed',
-      audition_failed: '❌ Failed'
-    };
-    return badges[status] || status;
-  };
 
   const stats = {
     pending: Array.isArray(registrations) ? registrations.filter(r => r.status === 'pending').length : 0,
@@ -261,7 +233,6 @@ const ClubRegistrationsPage = () => {
                   <th>Event</th>
                   <th>Performance Type</th>
                   <th>Description</th>
-                  <th>Audition Status</th>
                   <th>Status</th>
                   <th>Registered</th>
                   <th>Actions</th>
@@ -287,16 +258,6 @@ const ClubRegistrationsPage = () => {
                       <div className="description-cell">
                         {registration.performanceDescription || 'No description'}
                       </div>
-                    </td>
-                    <td>
-                      <span className={`badge badge-${
-                        registration.auditionStatus === 'audition_passed' ? 'success' :
-                        registration.auditionStatus === 'audition_failed' ? 'danger' :
-                        registration.auditionStatus === 'pending_audition' ? 'warning' :
-                        'secondary'
-                      }`}>
-                        {getAuditionBadge(registration.auditionStatus)}
-                      </span>
                     </td>
                     <td>
                       <span className={`badge badge-${
@@ -329,13 +290,6 @@ const ClubRegistrationsPage = () => {
                             >
                               ❌
                             </button>
-                            <button
-                              onClick={() => handleAudition(registration)}
-                              className="btn btn-sm btn-secondary"
-                              title="Update Audition"
-                            >
-                              🎪
-                            </button>
                           </>
                         )}
                         {registration.status === 'approved' && (
@@ -357,53 +311,6 @@ const ClubRegistrationsPage = () => {
           </div>
         )}
 
-        {/* Audition Modal */}
-        {auditionModal.show && (
-          <div className="modal-overlay" onClick={() => setAuditionModal({ show: false, registration: null })}>
-            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-              <h3>🎪 Update Audition Status</h3>
-              <p><strong>Student:</strong> {auditionModal.registration.user?.name}</p>
-              <p><strong>Performance:</strong> {auditionModal.registration.performanceType}</p>
-              
-              <div className="form-group">
-                <label>Audition Notes:</label>
-                <textarea 
-                  id="auditionNotes"
-                  rows="4"
-                  placeholder="Enter audition feedback..."
-                  className="form-control"
-                ></textarea>
-              </div>
-
-              <div className="modal-actions">
-                <button
-                  onClick={() => {
-                    const notes = document.getElementById('auditionNotes').value;
-                    updateAudition('audition_passed', notes);
-                  }}
-                  className="btn btn-success"
-                >
-                  ✅ Pass Audition
-                </button>
-                <button
-                  onClick={() => {
-                    const notes = document.getElementById('auditionNotes').value;
-                    updateAudition('audition_failed', notes);
-                  }}
-                  className="btn btn-danger"
-                >
-                  ❌ Fail Audition
-                </button>
-                <button
-                  onClick={() => setAuditionModal({ show: false, registration: null })}
-                  className="btn btn-secondary"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* Reject Modal */}
         {rejectModal.show && (

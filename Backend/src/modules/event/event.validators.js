@@ -100,6 +100,13 @@ module.exports = {
     qrCode: Joi.string().optional()
   }),
 
+  organizerAttendance: Joi.array().items(
+    Joi.object({
+      userId: objectId.required(),
+      status: Joi.string().valid('present', 'absent').required()
+    })
+  ).min(1),
+
   budgetRequest: Joi.object({
     amount: Joi.number().min(0).required(),
     breakdown: Joi.string().max(1000).optional(),

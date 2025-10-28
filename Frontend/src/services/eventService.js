@@ -35,9 +35,15 @@ const eventService = {
     return response.data;
   },
 
-  // Mark Attendance
+  // Mark Attendance (QR code scanning)
   markAttendance: async (id, data) => {
     const response = await api.post(`/events/${id}/attendance`, data);
+    return response.data;
+  },
+
+  // Update Organizer Attendance (bulk update for club members)
+  updateOrganizerAttendance: async (id, attendance) => {
+    const response = await api.post(`/events/${id}/organizer-attendance`, attendance);
     return response.data;
   },
 

@@ -133,8 +133,30 @@ class EventService {
         query.status = status;
       }
     } else {
-      // ✅ No status specified - only show public events by default
-      query.status = { $in: publicStatuses };
+      // ✅ No status specified
+      // If querying specific club AND user is authenticated, check if user is member
+      if (club && userContext) {
+        const { Membership } = require('../club/membership.model');
+        const isMember = await Membership.exists({
+          club: club,
+          user: userContext.id,
+          status: 'approved'
+        });
+        
+        const isCoordinator = userContext.roles?.global === 'coordinator';
+        const isAdmin = userContext.roles?.global === 'admin';
+        
+        // If user is member/coordinator/admin of this club, show ALL events
+        if (isMember || isCoordinator || isAdmin) {
+          // Don't filter by status - show all events from this club
+        } else {
+          // Not a member - only show public events
+          query.status = { $in: publicStatuses };
+        }
+      } else {
+        // No club specified or not authenticated - only show public events
+        query.status = { $in: publicStatuses };
+      }
     }
 
     // ✅ Filter by date for upcoming/past events
@@ -202,6 +224,20 @@ class EventService {
       data.canManage = isAdmin || isCoordinator || hasClubRole;
     } else {
       data.canManage = false;
+    }
+    
+    // ✅ Check if user has already registered for this event
+    if (userContext && userContext.id) {
+      const { EventRegistration } = require('./eventRegistration.model');
+      const existingRegistration = await EventRegistration.findOne({
+        event: id,
+        user: userContext.id
+      });
+      data.hasRegistered = !!existingRegistration;
+      data.myRegistration = existingRegistration || null;
+    } else {
+      data.hasRegistered = false;
+      data.myRegistration = null;
     }
     
     // ✅ Add dynamic photo count from Document collection

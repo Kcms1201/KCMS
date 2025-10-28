@@ -55,7 +55,13 @@ const ClubDashboard = () => {
   const fetchMemberAnalytics = async () => {
     try {
       const response = await analyticsService.getMemberAnalytics(clubId);
-      const analyticsData = response.data?.data || response.data || [];
+      // Backend: successResponse(res, { members, total }) → { status, data: { members, total } }
+      const analyticsData = response.data?.members || [];
+      
+      if (!Array.isArray(analyticsData)) {
+        console.warn('Analytics data is not an array:', analyticsData);
+        return;
+      }
       
       const activeCount = analyticsData.filter(m => m.isActive).length;
       const inactiveCount = analyticsData.length - activeCount;
@@ -545,21 +551,44 @@ const ClubDashboard = () => {
                 </div>
 
                 <div className="info-card">
-                  <h3>Recent Activity</h3>
+                  <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                    <h3>📅 Recent Events</h3>
+                    <Link to={`#`} onClick={() => setActiveTab('events')} className="btn-link">
+                      View All ({events.length})
+                    </Link>
+                  </div>
                   <div className="activity-list">
                     {events.slice(0, 3).map((event) => (
-                      <div key={event._id} className="activity-item">
+                      <div key={event._id} className="activity-item" style={{ 
+                        padding: '0.75rem', 
+                        borderBottom: '1px solid #e2e8f0',
+                        cursor: 'pointer'
+                      }}
+                      onClick={() => navigate(`/events/${event._id}`)}
+                      >
                         <span className="activity-icon">📅</span>
-                        <div className="activity-info">
+                        <div className="activity-info" style={{ flex: 1 }}>
                           <p><strong>{event.title}</strong></p>
-                          <p className="activity-meta">
-                            {new Date(event.dateTime).toLocaleDateString()} • {event.status}
+                          <p className="activity-meta" style={{ fontSize: '0.875rem', color: '#64748b', marginTop: '0.25rem' }}>
+                            📍 {event.venue || 'TBA'} • 🕐 {new Date(event.dateTime).toLocaleDateString()}
                           </p>
                         </div>
+                        <span className={`badge badge-${
+                          event.status === 'published' ? 'success' : 
+                          event.status === 'ongoing' ? 'info' :
+                          event.status === 'draft' ? 'secondary' : 'warning'
+                        }`} style={{ alignSelf: 'center' }}>
+                          {event.status}
+                        </span>
                       </div>
                     ))}
                     {events.length === 0 && (
-                      <p className="no-data">No recent activity</p>
+                      <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8' }}>
+                        <p className="no-data">No events yet</p>
+                        <Link to={`/events/create?clubId=${clubId}`} className="btn btn-primary" style={{ marginTop: '1rem' }}>
+                          + Create First Event
+                        </Link>
+                      </div>
                     )}
                   </div>
                 </div>

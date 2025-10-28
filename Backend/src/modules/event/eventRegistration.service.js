@@ -71,23 +71,18 @@ class EventRegistrationService {
       }
     }
 
-    // Determine audition status
-    let auditionStatus = 'not_required';
-    if (data.registrationType === 'performer' && event.requiresAudition) {
-      auditionStatus = 'pending_audition';
-    }
-
-    // Create registration
+    // ✅ SIMPLIFIED: No audition flow - performers go directly to pending approval
+    // Core members will manually call for auditions if needed, then approve/reject
     const registration = new EventRegistration({
       event: eventId,
       user: userContext.id,
-      registrationType: data.registrationType || 'audience',
+      registrationType: data.registrationType,
       representingClub: data.representingClub,
       performanceType: data.performanceType,
       performanceDescription: data.performanceDescription,
       notes: data.notes,
-      auditionStatus: auditionStatus,
-      status: data.registrationType === 'performer' ? 'pending' : 'approved'
+      auditionStatus: 'not_required', // ✅ Always not_required (manual audition scheduling)
+      status: data.registrationType === 'performer' ? 'pending' : 'approved' // Performers need approval
     });
 
     await registration.save();
@@ -108,6 +103,8 @@ class EventRegistrationService {
         notificationService.create({
           user: userId,
           type: 'performer_registration',
+          title: '🎭 New Performance Registration',
+          message: `A student wants to perform ${data.performanceType} at "${event.title}". Please review and approve.`,
           payload: {
             eventId,
             eventTitle: event.title,
@@ -197,9 +194,19 @@ class EventRegistrationService {
       ? 'performer_approved' 
       : 'performer_rejected';
     
+    const title = decision.status === 'approved'
+      ? '✅ Performance Approved!'
+      : '❌ Performance Declined';
+    
+    const message = decision.status === 'approved'
+      ? `Your ${registration.performanceType} performance for "${registration.event.title}" has been approved by ${registration.representingClub.name}!`
+      : `Your ${registration.performanceType} performance for "${registration.event.title}" was not approved. ${decision.rejectionReason ? `Reason: ${decision.rejectionReason}` : ''}`;
+    
     await notificationService.create({
       user: registration.user._id,
       type: notifType,
+      title,
+      message,
       payload: {
         eventId: registration.event._id,
         eventTitle: registration.event.title,

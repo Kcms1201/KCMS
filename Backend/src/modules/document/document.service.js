@@ -298,35 +298,78 @@ class DocumentService {
    * Get albums for a club
    */
   async getAlbums(clubId) {
-    const albums = await Document.aggregate([
+    console.log('🔍 getAlbums - Finding album metadata documents...');
+    
+    // ✅ Find all album metadata documents
+    const albumDocs = await Document.find({
+      club: clubId,
+      type: 'album' // ✅ Get album metadata documents
+    })
+    .sort({ createdAt: -1 })
+    .lean();
+
+    console.log(`📚 Found ${albumDocs.length} album metadata documents`);
+
+    // For each album, count the photos
+    const albumsWithCounts = await Promise.all(
+      albumDocs.map(async (albumDoc) => {
+        const photoCount = await Document.countDocuments({
+          club: clubId,
+          album: albumDoc.album,
+          type: { $ne: 'album' } // Count actual photos, not metadata
+        });
+
+        console.log(`   Album "${albumDoc.album}": ${photoCount} photos`);
+
+        return {
+          _id: albumDoc._id,
+          name: albumDoc.album,
+          description: albumDoc.metadata?.description || '',
+          count: photoCount,
+          createdAt: albumDoc.createdAt,
+          event: albumDoc.event || null
+        };
+      })
+    );
+
+    // Also get unique album names from uploaded photos (for legacy albums)
+    const legacyAlbums = await Document.aggregate([
       { 
         $match: { 
           club: new mongoose.Types.ObjectId(clubId),
-          type: { $ne: 'album' } // Exclude album metadata documents
+          type: { $ne: 'album' }, // Actual photos
+          album: { $exists: true, $ne: null }
         } 
       },
       {
         $group: {
           _id: '$album',
           count: { $sum: 1 },
-          lastUpload: { $max: '$createdAt' },
-          type: { $first: '$type' }
+          lastUpload: { $max: '$createdAt' }
         }
-      },
-      { $sort: { lastUpload: -1 } }
+      }
     ]);
 
-    return albums.map(album => ({
-      name: album._id,
-      count: album.count,
-      lastUpload: album.lastUpload,
-      type: album.type
-    }));
+    console.log(`📸 Found ${legacyAlbums.length} legacy albums (from photos)`);
+
+    // Merge legacy albums (only if not already in metadata list)
+    const existingNames = new Set(albumsWithCounts.map(a => a.name));
+    legacyAlbums.forEach(legacy => {
+      if (!existingNames.has(legacy._id)) {
+        console.log(`   Adding legacy album "${legacy._id}": ${legacy.count} photos`);
+        albumsWithCounts.push({
+          name: legacy._id,
+          count: legacy.count,
+          createdAt: legacy.lastUpload,
+          description: ''
+        });
+      }
+    });
+
+    console.log(`✅ Total albums: ${albumsWithCounts.length}`);
+    return albumsWithCounts;
   }
 
-  /**
-   * Bulk upload files
-   */
   async bulkUpload(clubId, userContext, files, { album, tags }) {
     if (files.length > 10) {
       const err = new Error('Maximum 10 files allowed per upload');

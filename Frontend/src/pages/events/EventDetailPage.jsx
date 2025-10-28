@@ -286,12 +286,23 @@ const EventDetailPage = () => {
 
             <div className="event-actions">
               {/* ✅ NEW: Event Registration for all users (students including club members) */}
-              {isPublished && (
+              {isPublished && !event.hasRegistered && (
                 <button 
                   onClick={() => navigate(`/events/${id}/register`)}
                   className="btn btn-primary"
                 >
                   📝 Register for Event
+                </button>
+              )}
+              
+              {/* ✅ Show "Already Registered" if user has registered */}
+              {isPublished && event.hasRegistered && (
+                <button 
+                  className="btn btn-success"
+                  disabled
+                  style={{ cursor: 'not-allowed', opacity: 0.7 }}
+                >
+                  ✅ Already Registered
                 </button>
               )}
               

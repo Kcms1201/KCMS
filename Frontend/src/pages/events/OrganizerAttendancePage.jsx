@@ -27,9 +27,9 @@ const OrganizerAttendancePage = () => {
       const eventData = eventResponse.data?.data?.event || eventResponse.data?.event;
       setEvent(eventData);
       
-      // ✅ FIX: Fetch organizers from separate endpoint
+      // Fetch organizers from separate endpoint
       const organizersResponse = await eventService.getEventOrganizers(eventId);
-      const organizersData = organizersResponse.data?.data?.organizers || [];
+      const organizersData = organizersResponse.data?.organizers || [];
       
       // Flatten the grouped structure into a single array
       const allOrganizers = [];
@@ -60,7 +60,8 @@ const OrganizerAttendancePage = () => {
 
   const markAttendance = async (userId, status) => {
     try {
-      await eventService.markAttendance(eventId, { userId, status });
+      // ✅ Use organizer-attendance endpoint with array format
+      await eventService.updateOrganizerAttendance(eventId, [{ userId, status }]);
       await fetchData(); // Refresh
     } catch (err) {
       alert('Failed to mark attendance: ' + (err.response?.data?.message || err.message));

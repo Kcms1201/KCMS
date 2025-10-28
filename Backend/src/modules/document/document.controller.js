@@ -81,6 +81,13 @@ exports.delete = async (req, res, next) => {
 // Create Album
 exports.createAlbum = async (req, res, next) => {
   try {
+    console.log('📁 CREATE ALBUM REQUEST:');
+    console.log('  Club ID:', req.params.clubId);
+    console.log('  Album Name:', req.body.name);
+    console.log('  Description:', req.body.description);
+    console.log('  Event ID:', req.body.eventId);
+    console.log('  User:', req.user.id);
+    
     const album = await svc.createAlbum(
       req.params.clubId,
       req.body.name,
@@ -88,8 +95,11 @@ exports.createAlbum = async (req, res, next) => {
       { id: req.user.id, ip: req.ip, userAgent: req.headers['user-agent'] },
       req.body.eventId // Optional: Link album to event
     );
+    
+    console.log('✅ Album created successfully:', album._id);
     successResponse(res, { album }, 'Album created successfully');
   } catch (err) {
+    console.error('❌ Album creation failed:', err.message);
     next(err);
   }
 };
@@ -97,9 +107,19 @@ exports.createAlbum = async (req, res, next) => {
 // Get Albums
 exports.getAlbums = async (req, res, next) => {
   try {
+    console.log('📚 GET ALBUMS REQUEST:');
+    console.log('  Club ID:', req.params.clubId);
+    
     const albums = await svc.getAlbums(req.params.clubId);
+    
+    console.log('✅ Found', albums.length, 'albums');
+    albums.forEach(album => {
+      console.log(`   - "${album.name}" (ID: ${album._id})`);
+    });
+    
     successResponse(res, { albums }, 'Albums retrieved successfully');
   } catch (err) {
+    console.error('❌ Get albums failed:', err.message);
     next(err);
   }
 };

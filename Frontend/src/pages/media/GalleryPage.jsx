@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import Layout from '../../components/Layout';
 import documentService from '../../services/documentService';
@@ -22,6 +22,9 @@ function GalleryPage() {
   const eventIdParam = searchParams.get('event');
   const actionParam = searchParams.get('action');
   const clubIdParam = searchParams.get('clubId');
+  
+  // ✅ Prevent duplicate album creation in React StrictMode
+  const albumCreationAttempted = useRef(false);
   
   const [documents, setDocuments] = useState([]);
   const [albums, setAlbums] = useState([]);
@@ -76,7 +79,9 @@ function GalleryPage() {
   
   // Handle event context and auto-create album
   useEffect(() => {
-    if (eventIdParam && clubIdParam) {
+    if (eventIdParam && clubIdParam && !albumCreationAttempted.current) {
+      console.log('📍 useEffect triggered - creating event album');
+      albumCreationAttempted.current = true; // ✅ Mark as attempted
       setUploadClubId(clubIdParam);
       handleAutoCreateEventAlbum();
     }
@@ -124,18 +129,29 @@ function GalleryPage() {
   };
 
   const fetchAlbums = async () => {
+    console.log('📚 fetchAlbums called, uploadClubId:', uploadClubId);
+    
     if (!uploadClubId) {
+      console.log('⚠️ No uploadClubId, skipping album fetch');
       setAlbums([]);
       return;
     }
 
     try {
+      console.log('🔄 Fetching albums for club:', uploadClubId);
       const response = await documentService.getAlbums(uploadClubId);
+      console.log('📦 Albums response:', response);
+      
       // Backend returns { albums: [...] } or { data: { albums: [...] } }
       const albumsList = response.albums || response.data?.albums || [];
+      console.log('✅ Setting albums state:', albumsList.length, 'albums');
+      albumsList.forEach(album => {
+        console.log(`   - "${album.name}"`);
+      });
+      
       setAlbums(albumsList);
     } catch (err) {
-      console.error('Error fetching albums:', err);
+      console.error('❌ Error fetching albums:', err);
       setAlbums([]);
     }
   };
@@ -219,6 +235,9 @@ function GalleryPage() {
         }
       }
       
+      console.log('🔍 Looking for existing album:', albumName);
+      console.log('📚 Existing albums:', existingAlbums.map(a => a.name));
+      
       const existingAlbum = existingAlbums.find(a => a.name === albumName);
       
       if (!existingAlbum) {
@@ -238,17 +257,34 @@ function GalleryPage() {
           console.error('❌ Album creation failed:');
           console.error('  Status:', createErr.response?.status);
           console.error('  Message:', createErr.response?.data?.message || createErr.message);
-          console.error('  Full error:', createErr.response?.data);
-          throw createErr;
+          
+          // ✅ If album already exists, continue anyway (don't throw error)
+          if (createErr.response?.status === 409 || createErr.response?.data?.message?.includes('already exists')) {
+            console.log('ℹ️ Album already exists (409) - continuing...');
+          } else {
+            console.error('  Full error:', createErr.response?.data);
+            throw createErr; // Only throw for non-duplicate errors
+          }
         }
       } else {
-        console.log('ℹ️ Album already exists');
+        console.log('ℹ️ Album already exists in fetched list');
       }
       
-      // Refresh albums list
-      await fetchAlbums();
+      // ✅ ALWAYS refresh albums list (even if creation failed due to duplicate)
+      console.log('🔄 Refreshing albums list with clubId:', clubIdParam);
+      
+      // Fetch albums directly with clubId (don't rely on state)
+      try {
+        const response = await documentService.getAlbums(clubIdParam);
+        const albumsList = response.albums || response.data?.albums || [];
+        console.log('✅ Fetched albums after creation:', albumsList.length);
+        setAlbums(albumsList);
+      } catch (fetchErr) {
+        console.error('❌ Failed to fetch albums after creation:', fetchErr);
+      }
       
       // Set selected album
+      console.log('📌 Setting selected album to:', albumName);
       setSelectedAlbum(albumName);
       setUploadAlbum(albumName);
       
@@ -347,6 +383,13 @@ function GalleryPage() {
       return;
     }
 
+    // ✅ Check if album already exists
+    const existingAlbum = albums.find(a => a.name.toLowerCase() === newAlbumName.trim().toLowerCase());
+    if (existingAlbum) {
+      alert(`Album "${newAlbumName}" already exists. Please use a different name or select it from the dropdown.`);
+      return;
+    }
+
     try {
       await documentService.createAlbum(uploadClubId, {
         name: newAlbumName,
@@ -360,7 +403,13 @@ function GalleryPage() {
       fetchAlbums();
     } catch (err) {
       console.error('Error creating album:', err);
-      alert('Failed to create album');
+      
+      // ✅ Show specific error message for duplicate albums
+      if (err.response?.status === 409 || err.response?.data?.message?.includes('already exists')) {
+        alert(`Album "${newAlbumName}" already exists. Please use a different name or select it from the dropdown.`);
+      } else {
+        alert('Failed to create album: ' + (err.response?.data?.message || err.message));
+      }
     }
   };
 

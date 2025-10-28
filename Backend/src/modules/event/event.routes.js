@@ -40,9 +40,11 @@ router.get(
   ctrl.listEvents
 );
 
-// Get Event Details (Public - Section 5.1)
+// Get Event Details (Public but with optional auth for registration check - Section 5.1)
+// Uses optionalAuth to check if user has registered, but still allows public access
 router.get(
   '/:id',
+  optionalAuth, // Get user context if logged in
   validate(v.eventId, 'params'),
   ctrl.getEvent
 );
@@ -169,6 +171,7 @@ router.post(
   authenticate,
   requireAssignedCoordinatorOrClubRoleForEvent(CORE_AND_PRESIDENT), // ✅ Event managers can update
   validate(v.eventId, 'params'),
+  validate(v.organizerAttendance), // ✅ Validate attendance array
   ctrl.updateOrganizerAttendance
 );
 

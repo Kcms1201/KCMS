@@ -10,6 +10,8 @@ const NotificationSchema = new mongoose.Schema(
                   'performer_registration','performer_approved','performer_rejected','event_rejected',
                   'audition_passed','audition_failed'
                 ], required: true },
+    title:    { type: String, default: 'Notification' }, // ✅ Optional with default
+    message:  { type: String, default: '' }, // ✅ Optional with default
     payload:  { type: mongoose.Schema.Types.Mixed, default: {} },
     priority: { type: String, enum: ['URGENT','HIGH','MEDIUM','LOW'], default: 'MEDIUM', index: true },
     isRead:   { type: Boolean, default: false, index: true },

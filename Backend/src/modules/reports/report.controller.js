@@ -147,7 +147,9 @@ exports.exportAttendanceCSV = async (req, res, next) => {
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename="attendance-${req.params.eventId}.csv"`);
     res.send(csv);
-  } catch (err) { next(err); }
+  } catch (err) { 
+    next(err); 
+  }
 };
 
 /**
