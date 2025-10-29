@@ -144,6 +144,12 @@ const documentService = {
     const response = await api.post(`/clubs/${clubId}/documents/upload/signature`, uploadData);
     return response.data;
   },
+
+  // Link existing photos to events (fix utility)
+  linkPhotosToEvents: async (clubId) => {
+    const response = await api.post(`/clubs/${clubId}/documents/link-to-events`);
+    return response.data;
+  },
 };
 
 export default documentService;

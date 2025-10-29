@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import eventService from '../../services/eventService';
+import documentService from '../../services/documentService';
 import '../../styles/CompletionChecklist.css';
 
 const CompletionChecklist = ({ event, onUploadComplete, canManage }) => {
   const navigate = useNavigate();
   const [uploading, setUploading] = useState(false);
   const [uploadingType, setUploadingType] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   // Calculate days remaining
   const getDaysRemaining = () => {
@@ -29,9 +31,6 @@ const CompletionChecklist = ({ event, onUploadComplete, canManage }) => {
   };
 
   const urgencyLevel = getUrgencyLevel();
-
-  // Check if event is incomplete
-  const isIncomplete = event.status === 'incomplete';
 
   // Checklist items
   const checklistItems = [
@@ -83,6 +82,29 @@ const CompletionChecklist = ({ event, onUploadComplete, canManage }) => {
     navigate(`/gallery?event=${event._id}&clubId=${clubId}&action=upload`);
   };
 
+  // Handle refresh photo count - links unlinked photos to event
+  const handleRefreshPhotoCount = async () => {
+    if (refreshing) return;
+    
+    setRefreshing(true);
+    try {
+      const clubId = event.club?._id || event.club;
+      const result = await documentService.linkPhotosToEvents(clubId);
+      
+      alert(`✅ Photo count refreshed! ${result.data?.totalLinked || 0} photos linked to events.`);
+      
+      // Trigger reload
+      if (onUploadComplete) {
+        onUploadComplete('photos');
+      }
+    } catch (err) {
+      console.error('Refresh error:', err);
+      alert(`❌ Refresh failed: ${err.response?.data?.message || err.message}`);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   // Handle upload for non-photo items (report, attendance, bills)
   const handleUpload = async (uploadType) => {
     if (uploading) return;
@@ -93,65 +115,21 @@ const CompletionChecklist = ({ event, onUploadComplete, canManage }) => {
       return;
     }
     
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = uploadType === 'report' ? '.pdf,.doc,.docx' :
-                   uploadType === 'attendance' ? '.xlsx,.xls,.csv' :
-                   uploadType === 'bills' ? '.pdf,image/*' : '*';
-    input.multiple = uploadType === 'bills';
-    
-    input.onchange = async (e) => {
-      const files = Array.from(e.target.files);
-      if (files.length === 0) return;
-
-      setUploading(true);
-      setUploadingType(uploadType);
-      
-      try {
-        const formData = new FormData();
-        files.forEach(file => {
-          formData.append(uploadType, file);
-        });
-
-        await eventService.uploadMaterials(event._id, formData);
-        alert('✅ Upload successful!');
-        
-        if (onUploadComplete) {
-          onUploadComplete(uploadType);
-        }
-      } catch (err) {
-        console.error('Upload error:', err);
-        alert(`❌ Upload failed: ${err.response?.data?.message || err.message}`);
-      } finally {
-        setUploading(false);
-        setUploadingType(null);
-      }
-    };
-    
-    input.click();
+    // ✅ SIMPLE SOLUTION: Navigate to event detail page with upload type
+    // This shows a clean upload section on the event page
+    navigate(`/events/${event._id}?upload=${uploadType}`);
   };
 
-  if (event.status !== 'pending_completion' && !isIncomplete) {
-    return null; // Don't show if not in pending_completion or incomplete status
+  // ✅ Show checklist for: pending_completion (initial upload) OR completed (allow re-uploads)
+  if (event.status !== 'pending_completion' && event.status !== 'completed') {
+    return null; // Only show for pending_completion or completed status
   }
 
   return (
-    <div className={`completion-checklist ${urgencyLevel} ${isIncomplete ? 'incomplete' : ''}`}>
+    <div className={`completion-checklist ${urgencyLevel}`}>
       {/* Header */}
       <div className="checklist-header">
-        {isIncomplete ? (
-          <>
-            <h3>❌ Event Marked Incomplete</h3>
-            <p className="deadline-text incomplete-text">
-              7-day deadline has passed. Please upload missing materials.
-            </p>
-            {event.incompleteReason && (
-              <p className="incomplete-reason">{event.incompleteReason}</p>
-            )}
-          </>
-        ) : (
-          <>
-            <h3>⏰ Complete Your Event</h3>
+        <h3>⏰ Complete Your Event</h3>
             {daysRemaining !== null && (
               <p className={`deadline-text ${urgencyLevel}`}>
                 {daysRemaining > 0 ? (
@@ -165,8 +143,6 @@ const CompletionChecklist = ({ event, onUploadComplete, canManage }) => {
                 )}
               </p>
             )}
-          </>
-        )}
       </div>
 
       {/* Progress Bar */}
@@ -215,21 +191,48 @@ const CompletionChecklist = ({ event, onUploadComplete, canManage }) => {
             {canManage && (
               <div className="item-action">
                 {!item.completed ? (
-                  <button 
-                    className="btn btn-sm btn-primary"
-                    onClick={() => handleUpload(item.uploadType)}
-                    disabled={uploading}
-                  >
-                    {uploading && uploadingType === item.uploadType ? '⏳ Uploading...' : 
-                     item.uploadType === 'photos' ? '📸 Upload in Gallery' : '📤 Upload'}
-                  </button>
+                  <>
+                    <button 
+                      className="btn btn-sm btn-primary"
+                      onClick={() => handleUpload(item.uploadType)}
+                      disabled={uploading}
+                    >
+                      {uploading && uploadingType === item.uploadType ? '⏳ Uploading...' : 
+                       item.uploadType === 'photos' ? '📸 Upload in Gallery' : '📤 Upload'}
+                    </button>
+                    {item.uploadType === 'photos' && item.count > 0 && (
+                      <button 
+                        className="btn btn-sm btn-secondary"
+                        onClick={handleRefreshPhotoCount}
+                        disabled={refreshing}
+                        style={{ marginLeft: '8px' }}
+                        title="If you uploaded photos but count is wrong, click to refresh"
+                      >
+                        {refreshing ? '⏳ Refreshing...' : '🔄 Refresh Count'}
+                      </button>
+                    )}
+                  </>
                 ) : item.uploadType === 'photos' ? (
-                  <button 
-                    className="btn btn-sm btn-outline"
-                    onClick={handleNavigateToGallery}
-                  >
-                    👁️ View in Gallery
-                  </button>
+                  <>
+                    <button 
+                      className="btn btn-sm btn-outline"
+                      onClick={handleNavigateToGallery}
+                    >
+                      👁️ View in Gallery
+                    </button>
+                    {/* ✅ Show refresh button even if marked complete, but count is wrong */}
+                    {item.count > 0 && item.count < (item.requiredCount || 999) && (
+                      <button 
+                        className="btn btn-sm btn-secondary"
+                        onClick={handleRefreshPhotoCount}
+                        disabled={refreshing}
+                        style={{ marginLeft: '8px' }}
+                        title="Photo count seems incorrect. Click to refresh and relink photos."
+                      >
+                        {refreshing ? '⏳ Refreshing...' : '🔄 Refresh Count'}
+                      </button>
+                    )}
+                  </>
                 ) : null}
               </div>
             )}
@@ -240,16 +243,9 @@ const CompletionChecklist = ({ event, onUploadComplete, canManage }) => {
       {/* Action Buttons - Removed bulk upload, users upload individually */}
 
       {/* Success Message */}
-      {completedCount === totalCount && !isIncomplete && (
+      {completedCount === totalCount && (
         <div className="checklist-success">
           <p>🎉 All materials uploaded! Your event will be marked as completed shortly.</p>
-        </div>
-      )}
-
-      {/* Incomplete Warning */}
-      {isIncomplete && canManage && (
-        <div className="checklist-warning">
-          <p>⚠️ This event is marked incomplete. Contact your coordinator if you believe this is an error.</p>
         </div>
       )}
     </div>

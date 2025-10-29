@@ -265,6 +265,35 @@ class EventRegistrationService {
   }
 
   /**
+   * Get ALL performer registrations for a club (pending, approved, rejected)
+   */
+  async listClubRegistrations(clubId, eventId = null) {
+    const query = {
+      representingClub: clubId,
+      registrationType: 'performer'
+      // ✅ NO status filter - get all (pending, approved, rejected)
+    };
+
+    if (eventId) {
+      query.event = eventId;
+    }
+
+    console.log('🔍 Query for club registrations:', query);
+
+    const registrations = await EventRegistration.find(query)
+      .populate('event user')
+      .sort({ createdAt: -1 });
+
+    console.log(`📊 Found ${registrations.length} registrations:`, {
+      pending: registrations.filter(r => r.status === 'pending').length,
+      approved: registrations.filter(r => r.status === 'approved').length,
+      rejected: registrations.filter(r => r.status === 'rejected').length
+    });
+
+    return registrations;
+  }
+
+  /**
    * Get pending performer registrations for a club
    */
   async listClubPendingRegistrations(clubId, eventId = null) {

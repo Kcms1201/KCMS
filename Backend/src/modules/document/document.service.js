@@ -442,6 +442,31 @@ class DocumentService {
         
         console.log(`📊 Total photos for event: ${photoCount}`);
         
+        // 🔍 DEBUG: List all photos for this event
+        const allEventPhotos = await Document.find({
+          event: albumDoc.event,
+          type: 'photo'
+        }).select('metadata.filename type storageType event').lean();
+        
+        console.log('🔍 DEBUG - All photos linked to this event:');
+        allEventPhotos.forEach((photo, index) => {
+          console.log(`  ${index + 1}. ${photo.metadata?.filename} (type: ${photo.type}, storage: ${photo.storageType})`);
+        });
+        
+        // 🔍 DEBUG: Check for photos in album but NOT linked to event
+        const orphanPhotos = await Document.find({
+          album: albumDoc.album,
+          type: 'photo',
+          $or: [{ event: { $exists: false } }, { event: null }, { event: { $ne: albumDoc.event } }]
+        }).select('metadata.filename type event').lean();
+        
+        if (orphanPhotos.length > 0) {
+          console.log('⚠️ DEBUG - Photos in album but NOT linked to event:');
+          orphanPhotos.forEach((photo, index) => {
+            console.log(`  ${index + 1}. ${photo.metadata?.filename} (event: ${photo.event || 'NONE'})`);
+          });
+        }
+        
         // Update event completion checklist
         if (photoCount >= 5) {
           const { Event } = require('../event/event.model');

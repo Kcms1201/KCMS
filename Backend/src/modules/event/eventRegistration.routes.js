@@ -48,6 +48,13 @@ router.delete(
   ctrl.cancelRegistration
 );
 
+// ✅ Get ALL registrations for a club (pending, approved, rejected)
+router.get(
+  '/clubs/:clubId/registrations',
+  authenticate,
+  ctrl.listClubRegistrations
+);
+
 // Get pending registrations for a club
 router.get(
   '/clubs/:clubId/pending-registrations',

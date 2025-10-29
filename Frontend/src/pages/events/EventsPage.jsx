@@ -35,8 +35,6 @@ const EventsPage = () => {
         params.status = 'completed';
       } else if (filter === 'pending_completion') {
         params.status = 'pending_completion';
-      } else if (filter === 'incomplete') {
-        params.status = 'incomplete';
       } else if (filter === 'draft' || filter === 'pending_coordinator' || filter === 'pending_admin') {
         params.status = filter;
       }
@@ -64,7 +62,6 @@ const EventsPage = () => {
       case 'pending_completion': return 'badge-warning';
       case 'completed': return 'badge-success';
       case 'cancelled': return 'badge-danger';
-      case 'incomplete': return 'badge-danger';
       default: return 'badge-info';
     }
   };
@@ -143,12 +140,6 @@ const EventsPage = () => {
                   onClick={() => setFilter('pending_completion')}
                 >
                   ⏳ Pending Completion
-                </button>
-                <button
-                  className={`filter-btn ${filter === 'incomplete' ? 'active' : ''}`}
-                  onClick={() => setFilter('incomplete')}
-                >
-                  ❌ Incomplete
                 </button>
               </>
             )}

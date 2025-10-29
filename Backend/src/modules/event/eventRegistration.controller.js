@@ -65,6 +65,23 @@ exports.getMyRegistration = async (req, res, next) => {
 };
 
 /**
+ * Get ALL registrations for a club (pending, approved, rejected)
+ */
+exports.listClubRegistrations = async (req, res, next) => {
+  try {
+    console.log('📋 Fetching ALL club registrations for club:', req.params.clubId);
+    const registrations = await registrationService.listClubRegistrations(
+      req.params.clubId,
+      req.query.eventId
+    );
+    console.log(`✅ Found ${registrations.length} total registrations`);
+    successResponse(res, registrations, 'All registrations retrieved');
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
  * Get pending registrations for a club
  */
 exports.listClubPendingRegistrations = async (req, res, next) => {

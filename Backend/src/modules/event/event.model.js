@@ -38,9 +38,8 @@ const EventSchema = new mongoose.Schema(
         'approved',
         'published',
         'ongoing',
-        'pending_completion',  // ✅ NEW: 7-day grace period after event
+        'pending_completion',  // ✅ 7-day grace period after event (no time limit on uploads)
         'completed',
-        'incomplete',          // ✅ NEW: Failed to complete within 7 days
         'archived'
       ],
       default: 'draft'
@@ -61,8 +60,6 @@ const EventSchema = new mongoose.Schema(
       billsUploaded: { type: Boolean, default: false }
     },
     completedAt: { type: Date },
-    markedIncompleteAt: { type: Date },
-    incompleteReason: { type: String },
     rejectionReason: String, // Reason for rejection
     rejectedBy: { type: mongoose.Types.ObjectId, ref: 'User' }, // Who rejected
     rejectedAt: Date, // When rejected
@@ -80,12 +77,21 @@ const EventSchema = new mongoose.Schema(
 );
 
 // Workplan Line 311: Enforce min 5 photos for completed events
-EventSchema.pre('save', function(next) {
+EventSchema.pre('save', async function(next) {
   // Check if status is being changed to 'completed'
   if (this.isModified('status') && this.status === 'completed') {
+    // ✅ FIX: Check photos in Document collection (not deprecated photos array)
+    const { Document } = require('../document/document.model');
+    const photoCount = await Document.countDocuments({
+      event: this._id,
+      type: 'photo'
+    });
+    
+    console.log(`🔍 Pre-save validation: Event ${this._id} has ${photoCount} photos`);
+    
     // Validate minimum 5 photos uploaded
-    if (!this.photos || this.photos.length < 5) {
-      const err = new Error('Minimum 5 photos required to mark event as completed (Workplan requirement)');
+    if (photoCount < 5) {
+      const err = new Error(`Minimum 5 photos required to mark event as completed. Currently: ${photoCount}/5 (Workplan requirement)`);
       err.statusCode = 400;
       return next(err);
     }

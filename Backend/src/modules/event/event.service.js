@@ -204,29 +204,41 @@ class EventService {
     
     const data = evt.toObject();
     
-    // ✅ Add canManage flag (BACKEND is SOURCE OF TRUTH)
+    // Add canManage flag (BACKEND is SOURCE OF TRUTH)
     if (userContext && userContext.id) {
       const isAdmin = userContext.roles?.global === 'admin';
       const isCoordinator = userContext.roles?.global === 'coordinator' && 
-                           evt.club?.coordinator?.toString() === userContext.id.toString();
+        evt.club.coordinator && 
+        evt.club.coordinator.toString() === userContext.id;
       
-      // Check club membership
+      // FIX: Check membership in PRIMARY club OR ANY PARTICIPATING club
       const { Membership } = require('../club/membership.model');
+      const allClubIds = [evt.club._id, ...(evt.participatingClubs || []).map(c => c._id || c)];
+      
       const membership = await Membership.findOne({
         user: userContext.id,
-        club: evt.club._id,
+        club: { $in: allClubIds },  // Check ALL involved clubs!
         status: 'approved'
       });
       
       const coreRoles = ['president', 'core', 'vicePresident', 'secretary', 'treasurer', 'leadPR', 'leadTech'];
       const hasClubRole = membership && coreRoles.includes(membership.role);
       
+      console.log(` canManage check for user ${userContext.id}:`, {
+        isAdmin,
+        isCoordinator,
+        hasClubRole: !!hasClubRole,
+        clubChecked: membership?.club?.toString(),
+        role: membership?.role,
+        allClubIds: allClubIds.map(id => id.toString())
+      });
+      
       data.canManage = isAdmin || isCoordinator || hasClubRole;
     } else {
       data.canManage = false;
     }
     
-    // ✅ Check if user has already registered for this event
+    // Check if user has already registered for this event
     if (userContext && userContext.id) {
       const { EventRegistration } = require('./eventRegistration.model');
       const existingRegistration = await EventRegistration.findOne({
@@ -251,12 +263,40 @@ class EventService {
     
     // ✅ Add registration counts for event management
     const { EventRegistration } = require('./eventRegistration.model');
-    const [registrationCount, pendingRegistrations] = await Promise.all([
-      EventRegistration.countDocuments({ event: id }),
-      EventRegistration.countDocuments({ event: id, status: 'pending' })
-    ]);
+    
+    // Total registrations from ALL clubs
+    const registrationCount = await EventRegistration.countDocuments({ event: id });
     data.registrationCount = registrationCount;
-    data.pendingRegistrations = pendingRegistrations;
+    
+    // ✅ Pending registrations - only count for clubs where user has management role
+    if (userContext && userContext.id) {
+      // Redefine allClubIds for this scope (primary club + participating clubs)
+      const allClubIds = [data.club._id, ...(data.participatingClubs || []).map(c => c._id || c)];
+      
+      // Get user's managed clubs (clubs where user has core/leadership role)
+      const { Membership } = require('../club/membership.model');
+      const userMemberships = await Membership.find({
+        user: userContext.id,
+        club: { $in: allClubIds },
+        status: 'approved'
+      });
+      
+      const coreRoles = ['president', 'core', 'vicePresident', 'secretary', 'treasurer', 'leadPR', 'leadTech'];
+      const userManagedClubIds = userMemberships
+        .filter(m => coreRoles.includes(m.role))
+        .map(m => m.club);
+      
+      // Count pending registrations only for user's managed clubs
+      const pendingRegistrations = await EventRegistration.countDocuments({ 
+        event: id, 
+        status: 'pending',
+        representingClub: { $in: userManagedClubIds }  // Only count for user's clubs
+      });
+      data.pendingRegistrations = pendingRegistrations;
+    } else {
+      // For non-authenticated users, show 0
+      data.pendingRegistrations = 0;
+    }
     
     return data;
   }
@@ -1006,12 +1046,15 @@ class EventService {
       throw err;
     }
 
-    // Check if event is in pending_completion or incomplete status
-    if (event.status !== 'pending_completion' && event.status !== 'incomplete') {
-      const err = new Error(`Cannot upload materials for events with status '${event.status}'`);
+    // Check if event allows material uploads
+    // ✅ Allow uploads for: pending_completion (initial upload) OR completed (re-upload/updates)
+    if (event.status !== 'pending_completion' && event.status !== 'completed') {
+      const err = new Error(`Cannot upload materials for events with status '${event.status}'. Only pending_completion and completed events can upload materials.`);
       err.statusCode = 400;
       throw err;
     }
+    
+    console.log(`✅ Event status '${event.status}' allows material uploads`);
 
     let updated = false;
 
@@ -1026,22 +1069,58 @@ class EventService {
 
     // Handle report upload
     if (files && files.report && files.report.length > 0) {
-      event.reportUrl = `/uploads/${files.report[0].filename}`;
-      event.completionChecklist.reportUploaded = true;
-      event.reportSubmittedAt = new Date();
-      updated = true;
+      console.log('📄 DEBUG - Report upload started');
+      console.log('📄 File path:', files.report[0].path);
+      console.log('📄 File name:', files.report[0].filename);
+      console.log('📄 File mimetype:', files.report[0].mimetype);
+      
+      try {
+        // ✅ Upload to Cloudinary and get URL
+        const reportUpload = await cloudinary.uploadFile(files.report[0].path, {
+          folder: 'events/reports',
+          resource_type: 'raw' // For PDF/DOC files
+        });
+        
+        console.log('✅ Cloudinary upload successful!');
+        console.log('📄 Cloudinary response:', reportUpload);
+        console.log('📄 secure_url:', reportUpload.secure_url);
+        
+        event.reportUrl = reportUpload.secure_url; // ✅ Save Cloudinary HTTPS URL
+        console.log('✅ Saved reportUrl to event:', event.reportUrl);
+        
+        event.completionChecklist.reportUploaded = true;
+        event.reportSubmittedAt = new Date();
+        updated = true;
+      } catch (uploadErr) {
+        console.error('❌ Cloudinary upload failed:', uploadErr);
+        throw uploadErr;
+      }
     }
 
     // Handle attendance upload
     if (files && files.attendance && files.attendance.length > 0) {
-      event.attendanceUrl = `/uploads/${files.attendance[0].filename}`;
+      // ✅ Upload to Cloudinary and get URL
+      const attendanceUpload = await cloudinary.uploadFile(files.attendance[0].path, {
+        folder: 'events/attendance',
+        resource_type: 'raw' // For Excel/CSV files
+      });
+      event.attendanceUrl = attendanceUpload.secure_url; // ✅ Save Cloudinary HTTPS URL
       event.completionChecklist.attendanceUploaded = true;
       updated = true;
     }
 
     // Handle bills upload
     if (files && files.bills) {
-      const billUrls = files.bills.map(file => `/uploads/${file.filename}`);
+      // ✅ Upload each bill to Cloudinary
+      const billUploadPromises = files.bills.map(file => 
+        cloudinary.uploadFile(file.path, {
+          folder: 'events/bills',
+          resource_type: 'auto' // Auto-detect (PDF or image)
+        })
+      );
+      const billUploads = await Promise.all(billUploadPromises);
+      const billUrls = billUploads.map(upload => upload.secure_url); // ✅ Cloudinary HTTPS URLs
+      
       event.billsUrls = event.billsUrls || [];
       event.billsUrls.push(...billUrls);
       event.completionChecklist.billsUploaded = event.budget > 0 ? event.billsUrls.length > 0 : true;
@@ -1061,7 +1140,13 @@ class EventService {
       event.completedAt = new Date();
     }
 
+    console.log('💾 Saving event to database...');
     await event.save();
+    
+    console.log('✅ Event saved successfully!');
+    console.log('📄 Final reportUrl in DB:', event.reportUrl);
+    console.log('📊 Final attendanceUrl in DB:', event.attendanceUrl);
+    console.log('🧾 Final billsUrls in DB:', event.billsUrls);
 
     // Audit log
     await auditService.log({

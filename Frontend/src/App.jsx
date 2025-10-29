@@ -24,6 +24,7 @@ import MemberActivityDetailPage from './pages/clubs/MemberActivityDetailPage';
 import EventsPage from './pages/events/EventsPage';
 import EventDetailPage from './pages/events/EventDetailPage';
 import EventRegistrationPage from './pages/events/EventRegistrationPage';
+import EventRegistrationsManagement from './pages/events/EventRegistrationsManagement';
 import CreateEventPage from './pages/events/CreateEventPage';
 import EditEventPage from './pages/events/EditEventPage';
 import OrganizerAttendancePage from './pages/events/OrganizerAttendancePage';
@@ -238,6 +239,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <EventRegistrationPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/events/:eventId/registrations/manage"
+            element={
+              <ProtectedRoute>
+                <EventRegistrationsManagement />
               </ProtectedRoute>
             }
           />

@@ -44,6 +44,13 @@ const registrationService = {
   },
 
   /**
+   * Get ALL registrations for a club (pending, approved, rejected)
+   */
+  getClubRegistrations: (clubId, filters = {}) => {
+    return api.get(`/clubs/${clubId}/registrations`, { params: filters });
+  },
+
+  /**
    * Get pending registrations for a club
    */
   getClubPendingRegistrations: (clubId, eventId = null) => {

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import Layout from '../../components/Layout';
 import CompletionChecklist from '../../components/event/CompletionChecklist';
@@ -10,10 +10,14 @@ import '../../styles/Events.css';
 const EventDetailPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const uploadType = searchParams.get('upload'); // e.g., 'report', 'attendance', 'bills'
+  
   const { user, clubMemberships } = useAuth();
   const [event, setEvent] = useState(null);
   const [loading, setLoading] = useState(true);
   const [rsvpLoading, setRsvpLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
     fetchEventDetails();
@@ -21,11 +25,20 @@ const EventDetailPage = () => {
 
   const fetchEventDetails = async () => {
     try {
-      const response = await eventService.getById(id);
+      console.log('🔄 Fetching event details (cache-busted)...');
+      
+      // ✅ Add cache-busting timestamp to force fresh data
+      const response = await eventService.getById(id, { _t: Date.now() });
       
       // ✅ FIX: Axios returns full response object
       // Structure: response.data = { status, data: { event } }
       const eventData = response.data?.data?.event || response.data?.event;
+      
+      console.log('📋 Fresh event data:', {
+        status: eventData?.status,
+        reportUrl: eventData?.reportUrl,
+        reportUploaded: eventData?.completionChecklist?.reportUploaded
+      });
       
       console.log('📋 EventDetailPage - Event data:', eventData);
       console.log('🤝 EventDetailPage - Participating clubs:', eventData?.participatingClubs);
@@ -207,6 +220,42 @@ const EventDetailPage = () => {
     return attendeeId === currentUserId;
   }) || false;
 
+  // Handle material upload
+  const handleMaterialUpload = async (e) => {
+    const files = Array.from(e.target.files);
+    if (files.length === 0) return;
+
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      files.forEach(file => {
+        formData.append(uploadType, file);
+      });
+
+      await eventService.uploadMaterials(event._id, formData);
+      alert('✅ Upload successful!');
+      
+      // Reload event data and clear upload param
+      await fetchEventDetails();
+      searchParams.delete('upload');
+      setSearchParams(searchParams);
+    } catch (err) {
+      console.error('Upload error:', err);
+      alert(`❌ Upload failed: ${err.response?.data?.message || err.message}`);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const getUploadConfig = (type) => {
+    const configs = {
+      report: { label: 'Event Report', accept: '.pdf,.doc,.docx', icon: '📄', multiple: false },
+      attendance: { label: 'Attendance Sheet', accept: '.xlsx,.xls,.csv', icon: '📊', multiple: false },
+      bills: { label: 'Bills/Receipts', accept: '.pdf,image/*', icon: '🧾', multiple: true }
+    };
+    return configs[type] || configs.report;
+  };
+
   return (
     <Layout>
       <div className="event-detail-page">
@@ -229,13 +278,11 @@ const EventDetailPage = () => {
                 event?.status === 'approved' ? 'info' :
                 event?.status === 'published' ? 'success' : 
                 event?.status === 'ongoing' ? 'info' : 
-                event?.status === 'pending_completion' ? 'warning' :  // ✅ NEW
-                event?.status === 'completed' ? 'success' :            // ✅ Changed to success
-                event?.status === 'incomplete' ? 'danger' :            // ✅ NEW
+                event?.status === 'pending_completion' ? 'warning' :
+                event?.status === 'completed' ? 'success' :
                 event?.status === 'cancelled' ? 'danger' : 'warning'
               }`}>
                 {event?.status === 'pending_completion' ? '⏳ PENDING COMPLETION' :
-                 event?.status === 'incomplete' ? '❌ INCOMPLETE' :
                  event?.status?.replace('_', ' ').toUpperCase() || 'N/A'}
               </span>
             </div>
@@ -399,8 +446,60 @@ const EventDetailPage = () => {
           </div>
         </div>
 
-        {/* Completion Checklist - Shows for pending_completion and incomplete events */}
-        {(event?.status === 'pending_completion' || event?.status === 'incomplete') && (
+        {/* ✅ Upload Section - Shows when ?upload=report/attendance/bills query param is present */}
+        {uploadType && canManage && (
+          <div className="info-card" style={{ marginBottom: '2rem', background: '#f0f9ff', borderLeft: '4px solid #3b82f6' }}>
+            <div className="section-header">
+              <h3>{getUploadConfig(uploadType).icon} Upload {getUploadConfig(uploadType).label}</h3>
+              <button 
+                onClick={() => {
+                  searchParams.delete('upload');
+                  setSearchParams(searchParams);
+                }}
+                className="btn btn-sm btn-outline"
+                style={{ marginLeft: 'auto' }}
+              >
+                ✕ Close
+              </button>
+            </div>
+            
+            <div style={{ padding: '1.5rem', background: 'white', borderRadius: '8px', margin: '1rem 0' }}>
+              <p style={{ marginBottom: '1rem', color: '#64748b' }}>
+                Select your {getUploadConfig(uploadType).label.toLowerCase()} file to upload.
+                {getUploadConfig(uploadType).multiple && ' You can select multiple files.'}
+              </p>
+              
+              <input
+                type="file"
+                accept={getUploadConfig(uploadType).accept}
+                multiple={getUploadConfig(uploadType).multiple}
+                onChange={handleMaterialUpload}
+                disabled={uploading}
+                style={{
+                  padding: '0.75rem',
+                  border: '2px dashed #cbd5e1',
+                  borderRadius: '8px',
+                  width: '100%',
+                  cursor: 'pointer',
+                  background: '#f8fafc'
+                }}
+              />
+              
+              {uploading && (
+                <p style={{ marginTop: '1rem', color: '#3b82f6', fontWeight: '500' }}>
+                  ⏳ Uploading... Please wait.
+                </p>
+              )}
+              
+              <div style={{ marginTop: '1rem', fontSize: '0.875rem', color: '#64748b' }}>
+                <strong>Accepted formats:</strong> {getUploadConfig(uploadType).accept.split(',').join(', ')}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Completion Checklist - Shows for pending_completion and completed events (allow re-uploads) */}
+        {(event?.status === 'pending_completion' || event?.status === 'completed') && (
           <CompletionChecklist 
             event={event} 
             canManage={canManage}
@@ -408,8 +507,11 @@ const EventDetailPage = () => {
           />
         )}
 
-        {/* ✅ Event Registrations Management */}
-        {canManage && event?.status !== 'draft' && (
+        {/* ✅ Event Registrations Management - Hide for completed events */}
+        {canManage && 
+         event?.status !== 'draft' && 
+         event?.status !== 'pending_completion' && 
+         event?.status !== 'completed' && (
           <div className="info-card" style={{ marginBottom: '2rem' }}>
             <div className="section-header">
               <h3>📝 Event Registrations</h3>
@@ -451,7 +553,7 @@ const EventDetailPage = () => {
             </div>
             
             <button 
-              onClick={() => navigate(`/clubs/${event.club._id}/registrations`)}
+              onClick={() => navigate(`/events/${event._id}/registrations/manage`)}
               className="btn btn-primary"
               style={{ width: '100%' }}
             >
@@ -498,8 +600,30 @@ const EventDetailPage = () => {
                 📋 View Organizer Attendance
               </button>
               <button 
-                onClick={() => alert('Event summary report feature coming soon')}
+                onClick={() => {
+                  console.log('🔍 DEBUG - Download Report Button Clicked');
+                  console.log('📄 event.reportUrl:', event?.reportUrl);
+                  console.log('📄 reportUrl type:', typeof event?.reportUrl);
+                  
+                  if (event?.reportUrl) {
+                    console.log('✅ Opening URL:', event.reportUrl);
+                    
+                    // Check if it's a Cloudinary URL or local path
+                    if (event.reportUrl.startsWith('http://') || event.reportUrl.startsWith('https://')) {
+                      console.log('✅ Valid HTTP/HTTPS URL - opening in new tab');
+                      window.open(event.reportUrl, '_blank');
+                    } else {
+                      console.error('❌ Invalid URL format (not HTTP/HTTPS):', event.reportUrl);
+                      alert(`❌ Invalid file URL format: ${event.reportUrl}\n\nThis appears to be a local path. The file needs to be re-uploaded to Cloudinary.`);
+                    }
+                  } else {
+                    console.log('❌ No reportUrl found');
+                    alert('❌ No event report uploaded yet. Please upload the report in the completion checklist.');
+                  }
+                }}
                 className="btn btn-outline"
+                disabled={!event?.reportUrl}
+                title={event?.reportUrl ? 'Download event report document' : 'No report uploaded yet'}
               >
                 📄 Download Event Report
               </button>

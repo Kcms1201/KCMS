@@ -1,227 +1,340 @@
-# 🎉 REGISTRATION FIXES - Oct 28, 2025, 11:10 AM
+# 🎯 EVENT REGISTRATION LOGIC FIXES
 
-## 🐛 **ISSUES FOUND:**
-
-### **Issue 1: Can Register Multiple Times** ❌
-**Problem:** User can click "Register for Event" multiple times and create duplicate registrations
-
-**Impact:** 
-- Database pollution with duplicate entries
-- Confusing for club presidents (multiple registrations from same person)
-- Bad user experience
+**Date:** Oct 29, 2025  
+**Issue:** Registration counts and visibility incorrect for multi-club events
 
 ---
 
-### **Issue 2: Audition Flow Too Complex** ❌
-**Problem:** Automatic audition status (`pending_audition`, `audition_passed`, `audition_failed`) too rigid
+## 📋 **REQUIREMENTS (FROM USER):**
 
-**Why This Is Bad:**
-- Not all events need auditions
-- Auditions should be scheduled manually by club leaders
-- Extra step creates friction in approval process
-- Requires separate "audition update" workflow
+### **1. Event-Specific Registrations**
+- Button should go to event-specific page, NOT all club registrations
+- ✅ **FIXED:** Now goes to `/events/:eventId/registrations/manage`
 
-**User's Request:**
-> "Once he registers for event, he will automatically be called to auditions by the core member manually. So remove the auditions stuff, make it easier."
+### **2. Pending Count Per Club**
+```
+Example:
+Event: Created by Mudra Club, Participating: Aalap Club
+Student registers representing Aalap Club
+
+Expected:
+- Aalap club sees: Pending = 1 (their approval needed)
+- Mudra club sees: Pending = 0 (not their responsibility)
+- Total registrations: 1 (from both clubs)
+```
+- ✅ **FIXED:** New page shows "Pending for My Clubs" separately
+
+### **3. Registration Visibility**
+- Each club sees ONLY registrations where they are the `representingClub`
+- Total count shows ALL registrations from ALL clubs
+- ✅ **FIXED:** Filter by "My Clubs Only" vs "All Clubs"
+
+### **4. RSVP Count**
+- When performer registers, RSVP count should increase
+- ⚠️ **NEEDS CLARIFICATION:** Currently registrations are separate from attendees
 
 ---
 
-## ✅ **FIXES IMPLEMENTED:**
+## ✅ **FIXES APPLIED:**
 
-### **FIX 1: Prevent Duplicate Registration** ✅
+### **1. New Event Registrations Management Page**
 
-**Backend Changes:**
-**File:** `Backend/src/modules/event/event.service.js` (Lines 229-241)
+**File Created:** `Frontend/src/pages/events/EventRegistrationsManagement.jsx`
+
+**Features:**
+- ✅ Shows registrations for specific event only
+- ✅ Filter by status (pending, approved, rejected)
+- ✅ Filter by club (My Clubs Only vs All Clubs)
+- ✅ Stats separated:
+  - **Total Registrations** (all clubs)
+  - **Pending for My Clubs** (needs your approval)
+  - **Approved** (all clubs)
+  - **Rejected** (all clubs)
+- ✅ Approve/Reject buttons only for "My Clubs"
+- ✅ Visual indicator (green background) for own club registrations
+
+**Route Added:** `/events/:eventId/registrations/manage`
+
+---
+
+### **2. Updated Event Detail Page**
+
+**File:** `Frontend/src/pages/events/EventDetailPage.jsx`
+
+**Changes:**
+```javascript
+// OLD:
+<button onClick={() => navigate(`/clubs/${event.club._id}/registrations`)}>
+  📋 View & Manage Registrations
+</button>
+
+// NEW:
+<button onClick={() => navigate(`/events/${event._id}/registrations/manage`)}>
+  📋 View & Manage Registrations
+</button>
+```
+
+**Impact:**
+- ✅ Goes to event-specific page
+- ✅ Shows only registrations for THIS event
+- ✅ Clear separation between clubs
+
+---
+
+### **3. Backend Pending Count Logic** ⚠️
+
+**File:** `Backend/src/modules/event/event.service.js` (Line 271-298)
+
+**Attempted Fix:**
+```javascript
+// Count pending registrations only for user's managed clubs
+const pendingRegistrations = await EventRegistration.countDocuments({ 
+  event: id, 
+  status: 'pending',
+  representingClub: { $in: allClubIds }
+});
+```
+
+**Note:** This counts for ALL involved clubs. The new management page handles club-specific filtering on the frontend.
+
+---
+
+## 🔍 **REGISTRATION FLOW (CORRECTED):**
+
+### **Scenario: Multi-Club Event**
+
+```
+Event: "Cultural Fest"
+Created by: Mudra Club
+Participating: Aalap Club, Drama Club
+
+Student (John) wants to perform:
+  1. Goes to event page
+  2. Clicks "Register"
+  3. Selects:
+     - Type: Performer
+     - Club: Aalap Club (representing)
+     - Performance: Dance
+  4. Submits
+
+Registration Created:
+  {
+    event: "Cultural Fest ID",
+    user: "John's ID",
+    registrationType: "performer",
+    representingClub: "Aalap Club ID",  // ✅ KEY FIELD!
+    status: "pending"
+  }
+
+Who Sees It:
+  ✅ Aalap Club leaders (president, vice president, core)
+  ❌ Mudra Club leaders (not their approval)
+  ✅ Admin (sees all)
+
+Approval Flow:
+  1. Aalap Club President logs in
+  2. Goes to /events/{eventId}/registrations/manage
+  3. Sees filter: "My Clubs Only" (default)
+  4. Sees John's registration
+  5. Clicks "Approve"
+  6. Status: pending → approved
+  7. John gets notification
+
+After Approval:
+  - Aalap sees: Pending = 0, Approved = 1
+  - Mudra sees: Pending = 0, Approved = 1 (if viewing "All Clubs")
+  - Total registrations = 1
+```
+
+---
+
+## ⚠️ **REMAINING ISSUE: RSVP Count**
+
+### **Current Behavior:**
+
+**EventRegistration Schema:**
+```javascript
+{
+  event: ObjectId,
+  user: ObjectId,
+  representingClub: ObjectId,
+  registrationType: 'performer' | 'audience',
+  status: 'pending' | 'approved' | 'rejected'
+}
+```
+
+**Event Schema:**
+```javascript
+{
+  attendees: [???]  // ❓ What is this field?
+}
+```
+
+### **Questions:**
+
+1. **What is `event.attendees`?**
+   - Is it a separate RSVP system?
+   - Is it populated from registrations?
+   - Is it manual attendance tracking?
+
+2. **Should performer registration → RSVP?**
+   - When performer registers: Should `attendees` count increase?
+   - When approved: Should they be added to `attendees`?
+   - Or are registrations completely separate from RSVPs?
+
+### **Possible Solutions:**
+
+#### **Option A: Auto-Add to Attendees on Approval**
 
 ```javascript
-// ✅ Check if user has already registered for this event
-if (userContext && userContext.id) {
-  const { EventRegistration } = require('./eventRegistration.model');
-  const existingRegistration = await EventRegistration.findOne({
-    event: id,
-    user: userContext.id
+// In reviewRegistration service (when approving)
+if (decision.status === 'approved' && registration.registrationType === 'performer') {
+  // Add to event attendees
+  await Event.findByIdAndUpdate(registration.event, {
+    $addToSet: {
+      attendees: {
+        user: registration.user,
+        club: registration.representingClub,
+        type: 'performer',
+        timestamp: new Date()
+      }
+    }
   });
-  data.hasRegistered = !!existingRegistration;
-  data.myRegistration = existingRegistration || null;
-} else {
-  data.hasRegistered = false;
-  data.myRegistration = null;
 }
 ```
 
-**What This Does:**
-- Checks if user already has a registration for this event
-- Adds `hasRegistered` boolean flag to event response
-- Includes full registration details in `myRegistration`
+#### **Option B: Separate RSVP System**
 
----
+Keep registrations separate from RSVPs. Add explicit RSVP button for audience members.
 
-**Frontend Changes:**
-**File:** `Frontend/src/pages/events/EventDetailPage.jsx` (Lines 289-307)
+#### **Option C: Count Registrations as RSVPs**
 
 ```javascript
-{/* ✅ Only show Register button if NOT registered */}
-{isPublished && !event.hasRegistered && (
-  <button 
-    onClick={() => navigate(`/events/${id}/register`)}
-    className="btn btn-primary"
-  >
-    📝 Register for Event
-  </button>
-)}
-
-{/* ✅ Show "Already Registered" if user has registered */}
-{isPublished && event.hasRegistered && (
-  <button 
-    className="btn btn-success"
-    disabled
-    style={{ cursor: 'not-allowed', opacity: 0.7 }}
-  >
-    ✅ Already Registered
-  </button>
-)}
-```
-
-**What This Does:**
-- Hides "Register for Event" button if already registered
-- Shows disabled "✅ Already Registered" button instead
-- Visual feedback that registration is complete
-
----
-
-### **FIX 2: Simplify Audition Flow** ✅
-
-**Backend Changes:**
-**File:** `Backend/src/modules/event/eventRegistration.service.js` (Lines 74-86)
-
-**BEFORE:**
-```javascript
-// Determine audition status
-let auditionStatus = 'not_required';
-if (data.registrationType === 'performer' && event.requiresAudition) {
-  auditionStatus = 'pending_audition';
-}
-
-const registration = new EventRegistration({
-  // ...
-  auditionStatus: auditionStatus,
-  status: data.registrationType === 'performer' ? 'pending' : 'approved'
+// In getById service
+const rsvpCount = await EventRegistration.countDocuments({
+  event: id,
+  status: 'approved'
 });
+data.rsvpCount = rsvpCount;
 ```
 
-**AFTER:**
-```javascript
-// ✅ SIMPLIFIED: No audition flow - performers go directly to pending approval
-// Core members will manually call for auditions if needed, then approve/reject
-const registration = new EventRegistration({
-  // ...
-  auditionStatus: 'not_required', // ✅ Always not_required (manual audition scheduling)
-  status: data.registrationType === 'performer' ? 'pending' : 'approved' // Performers need approval
-});
-```
+### **RECOMMENDATION:**
 
-**What Changed:**
-- ❌ Removed automatic `pending_audition` status
-- ✅ All registrations have `auditionStatus: 'not_required'`
-- ✅ Performers go directly to `status: 'pending'` (waiting for president approval)
-- ✅ Club leaders can manually schedule auditions offline, then approve/reject
-
----
-
-## 🔄 **NEW WORKFLOW:**
-
-### **Student Registration Flow:**
-
-```
-1. Student clicks "📝 Register for Event"
-   ↓
-2. Selects registration type:
-   - Audience → Auto-approved ✅
-   - Performer → Status: pending ⏳
-   ↓
-3. If Performer:
-   - Club president gets notification
-   - President manually schedules audition (offline)
-   - After audition, president clicks:
-     • ✅ Approve → Status: approved
-     • ❌ Reject → Status: rejected
-   ↓
-4. Button changes to "✅ Already Registered"
-   - Can't register again
-```
+**Option C** seems most logical:
+- Approved registrations = people who will attend
+- Simple calculation, no schema changes
+- Clear distinction: registrations (intent) vs attendance (actual)
 
 ---
 
 ## 🧪 **TESTING CHECKLIST:**
 
-### **Test 1: Prevent Duplicate Registration**
-- [ ] Register for an event as student
-- [ ] Refresh page
-- [ ] **Expected:** See "✅ Already Registered" (not "Register")
-- [ ] Try to navigate to `/events/{id}/register` manually
-- [ ] **Expected:** See existing registration or error
+### **Multi-Club Registration Flow:**
 
-### **Test 2: Simplified Approval**
-- [ ] Register as performer
-- [ ] Check database: `auditionStatus` should be `'not_required'`
-- [ ] Check database: `status` should be `'pending'`
-- [ ] Login as club president
-- [ ] View pending registrations
-- [ ] **Expected:** See Approve/Reject buttons (no audition status)
-- [ ] Click Approve
-- [ ] **Expected:** Registration approved immediately
+- [ ] Create event: Mudra + Aalap clubs
+- [ ] Student registers as performer for Aalap
+- [ ] Login as Aalap President
+  - [ ] Go to event page
+  - [ ] Click "View & Manage Registrations"
+  - [ ] Should see event-specific page ✅
+  - [ ] Filter: "My Clubs Only" (default)
+  - [ ] Should see 1 pending registration ✅
+  - [ ] Approve it
+  - [ ] Should move to "Approved" tab ✅
+- [ ] Login as Mudra President
+  - [ ] Go to same event page
+  - [ ] Click "View & Manage Registrations"
+  - [ ] Filter: "My Clubs Only"
+  - [ ] Should see 0 pending (not their club) ✅
+  - [ ] Change to "All Clubs"
+  - [ ] Should see 1 approved (from Aalap) ✅
+- [ ] Check event stats:
+  - [ ] Total Registrations: 1 ✅
+  - [ ] Pending for My Clubs: 0 for Mudra, 0 for Aalap ✅
+  - [ ] Approved: 1 ✅
 
----
+### **RSVP Count Test:**
 
-## 📊 **DATABASE SCHEMA (Unchanged):**
-
-**EventRegistration Model:**
-- `auditionStatus` field still exists (for backward compatibility)
-- But always set to `'not_required'`
-- Kept in case you want to re-enable audition tracking later
-
-**Recommendation:**
-- Keep field for now (doesn't hurt)
-- Can remove in future major version if never used
-
----
-
-## 🚀 **DEPLOYMENT STEPS:**
-
-1. ✅ **Backend changes applied** - restart backend server
-2. ✅ **Frontend changes applied** - frontend will auto-refresh
-3. ⏳ **Test the flow:**
-   - Register as student
-   - Check "Already Registered" appears
-   - Approve as president
-   - Verify no audition step required
+- [ ] Check if `event.attendees` field exists
+- [ ] Check current count display
+- [ ] Determine if registrations should count as RSVPs
+- [ ] Implement chosen solution
 
 ---
 
-## 📝 **NOTES:**
+## 📝 **FILES CHANGED:**
 
-### **Kept Audition Routes (For Future Use):**
-- `GET /api/clubs/:clubId/pending-auditions`
-- `POST /api/registrations/:registrationId/audition`
+### **Frontend:**
 
-**Why Keep Them?**
-- If you later want to re-enable audition tracking
-- Can be used for custom audition workflows
-- Doesn't interfere with current simplified flow
+1. **`src/pages/events/EventRegistrationsManagement.jsx`** - NEW FILE
+   - Event-specific registration management
+   - Club filtering
+   - Approve/reject for own clubs only
 
-### **Migration Not Needed:**
-- Existing registrations with `auditionStatus: 'pending_audition'` will continue to work
-- New registrations use simplified flow
-- No breaking changes
+2. **`src/pages/events/EventDetailPage.jsx`** - Line 556
+   - Changed button to go to event-specific page
+
+3. **`src/App.jsx`** - Lines 27, 245-252
+   - Added import and route for new page
+
+### **Backend:**
+
+4. **`src/modules/event/event.service.js`** - Lines 271-298
+   - Attempted fix for pending count (needs refinement)
 
 ---
 
-## ✅ **SUMMARY:**
+## 🎯 **SUMMARY:**
 
-| Fix | Status | Files Changed |
-|-----|--------|---------------|
-| Prevent duplicate registration | ✅ DONE | event.service.js, EventDetailPage.jsx |
-| Simplify audition flow | ✅ DONE | eventRegistration.service.js |
-| Add "Already Registered" button | ✅ DONE | EventDetailPage.jsx |
+### **What Works Now:**
 
-**READY TO TEST!** 🚀
+✅ Event-specific registration management page  
+✅ Filter by "My Clubs" vs "All Clubs"  
+✅ Approve/reject only for own club's registrations  
+✅ Visual distinction between clubs  
+✅ Total count from all clubs  
+✅ Separate "Pending for My Clubs" count  
+
+### **What Needs Clarification:**
+
+⚠️ RSVP count behavior  
+⚠️ Relationship between registrations and attendees  
+⚠️ Backend pending count calculation (currently uses all clubs)
+
+### **Next Steps:**
+
+1. Test the new management page
+2. Clarify RSVP requirements
+3. Implement RSVP counting solution
+4. Refine backend pending count if needed
+
+---
+
+## 💡 **USER EXPECTATIONS SUMMARY:**
+
+**From your message:**
+
+> "Only for the present event they have published"
+- ✅ FIXED: New page shows only current event
+
+> "Count of view registrations should show who have registered for the event on behalf of their club"
+- ✅ FIXED: Total count shows ALL registrations
+
+> "Registration pending count should only for the club they registered"
+- ✅ FIXED: "Pending for My Clubs" shows only relevant clubs
+
+> "If student register for Aalap club then pending count should increment only for Aalap club core members"
+- ✅ FIXED: Filter by "My Clubs Only"
+
+> "For Aalap club it should show the student to approve/reject, not for Mudra club"
+- ✅ FIXED: Approve/reject buttons only for own clubs
+
+> "Count of event registrations should be from both the clubs"
+- ✅ WORKING: Total count includes all clubs
+
+> "If he register as performer then RSVP count should increase"
+- ⚠️ NEEDS IMPLEMENTATION: Choose solution option
+
+---
+
+**Ready for testing!** 🚀

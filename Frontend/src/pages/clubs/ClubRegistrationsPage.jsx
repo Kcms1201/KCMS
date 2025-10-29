@@ -29,13 +29,25 @@ const ClubRegistrationsPage = () => {
   const fetchRegistrations = async () => {
     try {
       setLoading(true);
-      const response = await registrationService.getClubPendingRegistrations(clubId);
+      console.log('📋 Fetching ALL club registrations (with cache-busting)...');
+      
+      // ✅ Use getClubRegistrations to fetch ALL statuses (not just pending)
+      const response = await registrationService.getClubRegistrations(clubId, {
+        _t: Date.now() // Cache-busting
+      });
       
       // Backend returns: { status: 'success', data: [array], message: '...' }
       const data = response.data?.data || [];
       
       // Ensure data is an array
       const registrationsArray = Array.isArray(data) ? data : [];
+      
+      console.log(`✅ Fetched ${registrationsArray.length} registrations:`, {
+        pending: registrationsArray.filter(r => r.status === 'pending').length,
+        approved: registrationsArray.filter(r => r.status === 'approved').length,
+        rejected: registrationsArray.filter(r => r.status === 'rejected').length
+      });
+      
       setRegistrations(registrationsArray);
       
       // Extract unique events
@@ -44,7 +56,7 @@ const ClubRegistrationsPage = () => {
       
       setError('');
     } catch (err) {
-      console.error('Error fetching registrations:', err);
+      console.error('❌ Error fetching registrations:', err);
       setError('Failed to load registrations');
       setRegistrations([]); // Ensure registrations is always an array
     } finally {

@@ -58,10 +58,23 @@ function validateFile(file, category = 'image') {
     );
   }
 
-  // Basic security: check for double extensions
+  // Security: Check for dangerous double extensions
+  // Allow dots in filenames (e.g., "my.photo.name.jpg" is OK)
+  // But reject files with executable extensions before the final extension
+  // (e.g., "malware.php.jpg", "script.js.png")
+  const dangerousExtensions = [
+    'exe', 'bat', 'cmd', 'com', 'pif', 'scr', 'vbs', 'js', 'jse',
+    'php', 'php3', 'php4', 'php5', 'phtml', 'asp', 'aspx', 'jsp',
+    'sh', 'bash', 'cgi', 'pl', 'py', 'rb', 'jar', 'app'
+  ];
+  
   const nameParts = file.originalname.split('.');
-  if (nameParts.length > 2) {
-    throw new Error('File with multiple extensions not allowed');
+  // Check all parts except the last one (which is the real extension we already validated)
+  for (let i = 0; i < nameParts.length - 1; i++) {
+    const part = nameParts[i].toLowerCase();
+    if (dangerousExtensions.includes(part)) {
+      throw new Error(`Suspicious file extension detected: .${part}`);
+    }
   }
 
   return true;

@@ -16,8 +16,9 @@ const eventService = {
   },
 
   // Get Event Details
-  getById: async (id) => {
-    const response = await api.get(`/events/${id}`);
+  getById: async (id, params = {}) => {
+    // ✅ Support cache-busting with params (e.g., { _t: Date.now() })
+    const response = await api.get(`/events/${id}`, { params });
     return response.data;
   },
 
