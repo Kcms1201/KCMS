@@ -176,11 +176,21 @@ class EventRegistrationService {
     }
 
     // Update registration
-    registration.status = decision.status; // 'approved' or 'rejected'
-    registration.approvedBy = userContext.id;
-    registration.approvedAt = new Date();
-    if (decision.rejectionReason) {
+    if (decision.status === 'approved') {
+      // Approve performer
+      registration.status = 'approved';
+      registration.approvedBy = userContext.id;
+      registration.approvedAt = new Date();
+    } else {
+      // ✅ NEW LOGIC: Convert rejected performers to audience
+      registration.status = 'approved';  // Auto-approve as audience
+      registration.registrationType = 'audience';  // Change from performer to audience
+      registration.approvedBy = userContext.id;
+      registration.approvedAt = new Date();
       registration.rejectionReason = decision.rejectionReason;
+      // Clear performer-specific fields
+      registration.performanceType = null;
+      registration.performanceDescription = null;
     }
 
     await registration.save();
@@ -196,11 +206,11 @@ class EventRegistrationService {
     
     const title = decision.status === 'approved'
       ? '✅ Performance Approved!'
-      : '❌ Performance Declined';
+      : '🎭 Performance Declined - Registered as Audience';
     
     const message = decision.status === 'approved'
       ? `Your ${registration.performanceType} performance for "${registration.event.title}" has been approved by ${registration.representingClub.name}!`
-      : `Your ${registration.performanceType} performance for "${registration.event.title}" was not approved. ${decision.rejectionReason ? `Reason: ${decision.rejectionReason}` : ''}`;
+      : `Your performance request for "${registration.event.title}" was not approved. ${decision.rejectionReason ? `Reason: ${decision.rejectionReason}. ` : ''}However, you have been automatically registered as an audience member. We look forward to seeing you at the event!`;
     
     await notificationService.create({
       user: registration.user._id,

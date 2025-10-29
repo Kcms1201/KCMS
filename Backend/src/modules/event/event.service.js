@@ -215,21 +215,20 @@ class EventService {
       const { Membership } = require('../club/membership.model');
       const allClubIds = [evt.club._id, ...(evt.participatingClubs || []).map(c => c._id || c)];
       
-      const membership = await Membership.findOne({
+      const memberships = await Membership.find({
         user: userContext.id,
         club: { $in: allClubIds },  // Check ALL involved clubs!
         status: 'approved'
       });
       
       const coreRoles = ['president', 'core', 'vicePresident', 'secretary', 'treasurer', 'leadPR', 'leadTech'];
-      const hasClubRole = membership && coreRoles.includes(membership.role);
+      const hasClubRole = memberships.some(m => coreRoles.includes(m.role));
       
-      console.log(` canManage check for user ${userContext.id}:`, {
+      console.log(`✅ canManage check for user ${userContext.id}:`, {
         isAdmin,
         isCoordinator,
-        hasClubRole: !!hasClubRole,
-        clubChecked: membership?.club?.toString(),
-        role: membership?.role,
+        hasClubRole,
+        userMemberships: memberships.map(m => ({ club: m.club.toString(), role: m.role })),
         allClubIds: allClubIds.map(id => id.toString())
       });
       
@@ -297,6 +296,13 @@ class EventService {
       // For non-authenticated users, show 0
       data.pendingRegistrations = 0;
     }
+    
+    // ✅ RSVP count = approved audience + approved performers
+    const rsvpCount = await EventRegistration.countDocuments({
+      event: id,
+      status: 'approved'
+    });
+    data.rsvpCount = rsvpCount;
     
     return data;
   }

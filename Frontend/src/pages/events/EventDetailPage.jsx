@@ -326,7 +326,7 @@ const EventDetailPage = () => {
               {canManage && (
                 <div className="meta-item">
                   <span className="meta-icon">✅</span>
-                  <span><strong>{event?.attendees?.length || 0} RSVPs received</strong></span>
+                  <span><strong>{event?.rsvpCount || 0} RSVPs received</strong> (approved registrations)</span>
                 </div>
               )}
             </div>
@@ -662,27 +662,7 @@ const EventDetailPage = () => {
             </div>
           )}
 
-          {canManage && event?.attendees && event.attendees.length > 0 && (
-            <div className="info-card">
-              <h3>RSVPs / Attendees ({event.attendees.length})</h3>
-              <div className="attendees-list">
-                {event.attendees.map((attendee, index) => (
-                  <div key={attendee._id || index} className="attendee-item">
-                    <span className="attendee-number">{index + 1}.</span>
-                    <div className="attendee-info">
-                      <strong>{attendee.profile?.name || attendee.email || 'Unknown'}</strong>
-                      {attendee.rollNumber && (
-                        <span className="attendee-roll"> - {attendee.rollNumber}</span>
-                      )}
-                      {attendee.profile?.department && (
-                        <span className="attendee-dept"> ({attendee.profile.department})</span>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+          {/* Old attendees list removed - use "View & Manage Registrations" page instead */}
 
         </div>
       </div>

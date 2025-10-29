@@ -9,13 +9,13 @@ import '../../styles/Tables.css';
 const EventRegistrationsManagement = () => {
   const { eventId } = useParams();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, clubMemberships } = useAuth();
   
   const [event, setEvent] = useState(null);
   const [registrations, setRegistrations] = useState([]);
   const [filteredRegistrations, setFilteredRegistrations] = useState([]);
   const [filter, setFilter] = useState('all'); // all, pending, approved, rejected
-  const [clubFilter, setClubFilter] = useState('my'); // my, all
+  // Removed clubFilter - always show only user's clubs
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   
@@ -30,7 +30,7 @@ const EventRegistrationsManagement = () => {
 
   useEffect(() => {
     applyFilters();
-  }, [filter, clubFilter, registrations]);
+  }, [filter, registrations, userClubs]);
 
   const fetchData = async () => {
     try {
@@ -48,14 +48,31 @@ const EventRegistrationsManagement = () => {
         ...(eventData.participatingClubs || []).map(c => c._id)
       ];
       
-      // Filter to clubs where user has management role
+      // ✅ FIX: Get clubs where user has management role
+      const coreRoles = ['president', 'vicePresident', 'core', 'secretary', 'treasurer', 'leadPR', 'leadTech'];
+      
       const userManagedClubs = allEventClubIds.filter(clubId => {
         // Check if user is admin or coordinator
         if (user.roles?.global === 'admin' || user.roles?.global === 'coordinator') {
           return true;
         }
-        // Check if user has role in this club (would need membership check)
-        return true; // For now, assume canManage check already passed
+        
+        // Check if user has management role in this club
+        // Note: Backend already filters to approved memberships, no status field in response
+        const membership = clubMemberships?.find(m => {
+          const clubIdMatch = m.club?._id === clubId || m.club === clubId || m.club?._id?.toString() === clubId?.toString();
+          const hasRole = coreRoles.includes(m.role);
+          return clubIdMatch && hasRole;
+        });
+        
+        return !!membership;
+      });
+      
+      console.log('👤 User managed clubs:', {
+        allEventClubs: allEventClubIds,
+        userManagedClubs,
+        clubMemberships: clubMemberships?.map(m => ({ club: m.club?.name || m.club, role: m.role })),
+        user: user?.email
       });
       
       setUserClubs(userManagedClubs);
@@ -93,13 +110,10 @@ const EventRegistrationsManagement = () => {
       filtered = filtered.filter(r => r.status === filter);
     }
 
-    // Filter by club (my clubs vs all clubs)
-    if (clubFilter === 'my') {
-      // Show only registrations where representingClub is one of user's clubs
-      filtered = filtered.filter(r => 
-        userClubs.includes(r.representingClub?._id || r.representingClub)
-      );
-    }
+    // ✅ Always show only user's clubs (removed "All Clubs" option)
+    filtered = filtered.filter(r => 
+      userClubs.includes(r.representingClub?._id || r.representingClub)
+    );
 
     setFilteredRegistrations(filtered);
   };
@@ -249,24 +263,17 @@ const EventRegistrationsManagement = () => {
               </button>
             </div>
           </div>
-
-          <div className="filter-group">
-            <label>Show:</label>
-            <div className="button-group">
-              <button 
-                onClick={() => setClubFilter('my')}
-                className={`btn ${clubFilter === 'my' ? 'btn-primary' : 'btn-secondary'}`}
-              >
-                🎯 My Clubs Only
-              </button>
-              <button 
-                onClick={() => setClubFilter('all')}
-                className={`btn ${clubFilter === 'all' ? 'btn-primary' : 'btn-secondary'}`}
-              >
-                🌐 All Clubs
-              </button>
-            </div>
-          </div>
+        </div>
+        
+        <div className="info-message" style={{ 
+          padding: '0.75rem', 
+          background: '#f0f9ff', 
+          border: '1px solid #38bdf8',
+          borderRadius: '8px',
+          marginBottom: '1rem',
+          color: '#0369a1'
+        }}>
+          📌 Showing registrations for your clubs only
         </div>
 
         {/* Error Message */}
@@ -301,7 +308,7 @@ const EventRegistrationsManagement = () => {
                     }}>
                       <td>
                         <div className="user-cell">
-                          <strong>{registration.user?.name || 'Unknown'}</strong>
+                          <strong>{registration.user?.profile?.name || registration.user?.name || 'Unknown'}</strong>
                           <small>{registration.user?.email}</small>
                           <small>{registration.user?.rollNumber}</small>
                         </div>
